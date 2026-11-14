@@ -10,9 +10,7 @@ by a deadline. Arriving late is not game over; it lowers your score.
 - In-game text: English.
 
 ## Score
-Based on:
-- how late you arrived
-- how much rewind you used
+Based on how late you arrived. Using rewind does not affect the score.
 
 ## Time
 - One in-game clock for everything.
@@ -46,7 +44,8 @@ Based on:
 
 ## Station view (top-down, WASD)
 - Run starts in the start city's station; walk to your first train.
-- Two layouts: small station and big station (jam scope).
+- Station layouts are reconstructed from the real station's paths in
+  OpenStreetMap.
 - Walk to the correct platform; board by touching the train.
 - Missed the train: wait in the station for the next one.
 - While in a station you can switch between station view and map view.
