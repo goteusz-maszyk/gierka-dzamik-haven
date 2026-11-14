@@ -12,9 +12,7 @@ var menu_button: Button
 func _ready() -> void:
 	var visual: Dictionary = simulation.config.visual
 	var text: Dictionary = simulation.config.text
-	var ui := CanvasLayer.new()
-	add_child(ui)
-	for key in ["title", "note", "status", "help"]:
+	for key in ["title", "status", "help"]:
 		var label := Label.new()
 		var rect: Array = visual[key + "_rect"]
 		label.position = Vector2(rect[0], rect[1])
@@ -23,23 +21,9 @@ func _ready() -> void:
 		label.add_theme_color_override("font_color", Color(visual.text))
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		label.text = text.running if key == "status" else text[key]
-		ui.add_child(label)
+		$CanvasLayer.add_child(label)
 		if key == "status":
 			status = label
-	for key in ["restart", "menu"]:
-		var button := Button.new()
-		var rect: Array = visual[key + "_rect"]
-		button.position = Vector2(rect[0], rect[1])
-		button.size = Vector2(rect[2], rect[3])
-		button.text = text[key]
-		button.add_theme_font_size_override("font_size", int(visual.button_font_size))
-		ui.add_child(button)
-		if key == "restart":
-			restart_button = button
-			button.pressed.connect(restart)
-		else:
-			menu_button = button
-			button.pressed.connect(return_to_menu)
 
 
 func restart() -> void:
@@ -47,9 +31,8 @@ func restart() -> void:
 	status.text = simulation.config.text.running
 	queue_redraw()
 
-
-func return_to_menu() -> void:
-	get_tree().change_scene_to_file(MENU_PATH)
+func give_up() -> void:
+	get_tree().change_scene_to_file("res://scene/main_menu.tscn")
 
 
 func _process(delta: float) -> void:
