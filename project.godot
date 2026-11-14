@@ -13,6 +13,7 @@ config_version=5
 config/name="Gierka dzamik haven"
 config/description="kocham 31lo i słowację"
 config/version="0.1"
+run/main_scene="uid://cgvgdnaa68ssl"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 

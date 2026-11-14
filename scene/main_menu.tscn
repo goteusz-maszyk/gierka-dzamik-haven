@@ -1,0 +1,52 @@
+[gd_scene format=3 uid="uid://cgvgdnaa68ssl"]
+
+[ext_resource type="Script" uid="uid://d05itsov12cyu" path="res://scripts/main_menu.gd" id="1_2fwvj"]
+[ext_resource type="Texture2D" uid="uid://bsjwa3w73h6ft" path="res://assets/main menu.png" id="1_hxu56"]
+[ext_resource type="PackedScene" uid="uid://b05o6ky4kg05v" path="res://scene/button.tscn" id="2_hxu56"]
+
+[node name="MainMenu" type="Control" unique_id=2024463473]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_2fwvj")
+
+[node name="background" type="Sprite2D" parent="." unique_id=1150299490]
+position = Vector2(160, 90)
+texture = ExtResource("1_hxu56")
+
+[node name="CenterText" type="HBoxContainer" parent="." unique_id=1654327391]
+layout_mode = 0
+offset_right = 320.0
+offset_bottom = 62.0
+alignment = 1
+
+[node name="Label" type="Label" parent="CenterText" unique_id=528187503]
+layout_mode = 2
+text = "szalone vlaki czy cos"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="OptionsBtn" parent="." unique_id=1070156597 instance=ExtResource("2_hxu56")]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 89.0
+offset_right = 20.0
+offset_bottom = 89.0
+text = "Options"
+
+[node name="StartBtn" parent="." unique_id=64624246 instance=ExtResource("2_hxu56")]
+layout_mode = 0
+offset_left = 132.0
+offset_top = 89.0
+offset_right = 132.0
+offset_bottom = 89.0
+text = "Start"
+
+[node name="ExitBtn" parent="." unique_id=1805175452 instance=ExtResource("2_hxu56")]
+layout_mode = 0
+offset_left = 244.0
+offset_top = 89.0
+offset_right = 244.0
+offset_bottom = 89.0
+text = "Exit"
+
+[connection signal="button_down" from="ExitBtn" to="." method="_on_exit_btn_click"]
