@@ -19,8 +19,7 @@ your result worse.
 ## Run flow
 1. Game launches straight into a run (no main menu, no how-to-play screen
    for now).
-2. Run starts at **08:00** in-game. Start city is picked, timetables and
-   events are generated (seeded), deadline is calculated.
+2. Start city is picked, timetables and events are generated (seeded), deadline is calculated.
 3. Player spawns at the entrance of the start city's station, in station view.
 4. Player walks to a platform and boards a train.
 5. On boarding, the game switches to map view, with the player's train
@@ -34,6 +33,7 @@ your result worse.
 ## Deadline
 - Deadline = fastest possible route from start to Kraków + a fixed buffer.
 - Fastest route is calculated from the generated timetable, ignoring events.
+- Start time is determined as 09:00 - deadline time
 
 ## Score
 - Result is simply how many minutes late (or early) you arrived.
@@ -83,8 +83,9 @@ your result worse.
   - 5 real minutes of riding = 3 in-game hours.
 
 ## Map view
-- Real Polish rail network, drawn simplified in a clean Mini Metro style
-  (vector art). Station view is pixel art; the game mixes both styles.
+- Real Polish rail network, drawn simplified in a clean Mini Metro style.
+  Station view is drawn from osm data around station; Some specific textures
+  are manually drawn like player or train models. the game mixes both styles.
 - Each line has its own colour. Trains are drawn in their line's colour.
 - Station names are hidden; a station's name appears when you hover it.
 - Kraków is always highlighted.
@@ -97,40 +98,37 @@ your result worse.
   train from the map.
 
 ### Riding a train
-- Click a later stop on your train's route to mark "get off here". Any stop
-  after the current one is valid, including the very next one.
-- You can only mark stops where the train actually stops (not stations it
-  passes through).
-- You can move the mark to another valid stop or cancel it any time before
-  arriving.
-- You can never get off at a stop you did not mark.
-- When the train reaches the marked stop you get off and enter station view
-  on the arrival platform.
-- No mark: you get off at the line's last stop.
-- If the train stops in Kraków you always get off there automatically, even
-  without a mark (this ends the run).
-- If your train is cancelled:
-  - while it is moving: you are dropped at the next stop on its route;
-  - while it is standing in a station: you are dropped at that station.
+
+- You must manually click the "Disembark" action while the train is stopped at a station to get off.
+- You can only disembark while the train is standing at a station, not while it is moving.
+- You must remember to disembark yourself when the train reaches your intended station.
+- If you do not click "Disembark" before the train departs, you remain aboard and travel to the next stop.
+- You can disembark at any station where the train actually stops, including Kraków.
+- There are no automatic disembarkations, destination marks, or advance exit selections.
+- If you miss your intended stop, you must continue riding until another station where you can manually disembark.
 - The player judges transfers on their own (no hints, no route planner).
 
 ## Trains and timetables
 - Lines run in both directions.
-- Kraków is always a terminus: no train continues past Kraków.
-- All trains move at the same single global speed. Travel time between two
-  stations = distance / global speed.
-- Every train waits a fixed time at each stop where it stops (2 in-game
-  minutes, tune later). Lines with fewer stops ("fast" trains) are faster
-  only because they stop less. There are no separate train types.
-- Frequency is set per line (e.g. a train every 60 min in each direction).
-- Timetables are generated per run (seeded) from the lines and their
-  frequency.
-- Timetables repeat indefinitely; there is no last train, so the player can
-  never get stuck.
+- Each train has its own maximum speed, acceleration and braking based on category.
+- Trains accelerate when departing, cruise when possible, and brake before scheduled stops.
+- Travel time depends on distance and train performance. On short distances, maximum speed may never be reached.
+- Every train waits 2 in-game minutes at each scheduled stop (tune later).
+- Line configuration determines route, stops, direction and frequency.
+- Frequency is set per line (e.g. every 60 minutes in each direction).
+- Timetables are generated per run (seeded) using lines, frequencies and train categories.
+- Timetables repeat indefinitely; there is no last train.
 - Each line uses a fixed platform per direction at each station.
-- Trains ignore each other (they can overlap on the same track).
-- Trains have no names/numbers shown to the player yet.
-- Missed the train: wait in the station for the next one.
+- Trains ignore each other and can overlap on the same track
+- Trains have numbers generated based on category and index (in generation)
+- Missed the train: wait for the next one.
+
+| Category | Max speed | Acceleration | Braking |
+| --------- | -------- | --------- | ---------  |
+| Local     | 80 km/h  | 0.7 m/s² | 0.45 m/s²  |
+| Regional  | 120 km/h | 0.5 m/s² | 0.55 m/s²  |
+| Express   | 160 km/h | 0.4 m/s² | 0.65 m/s²  |
+| Intercity | 200 km/h | 0.3 m/s² | 0.75 m/s²  |
 
 ## Events
 - Generated once per run (seeded). Rewinding replays the exact same events.
@@ -150,14 +148,13 @@ your result worse.
 
 | Event          | Effect                                                     |
 |----------------|------------------------------------------------------------|
-| Drunk driver   | Long stop (e.g. 30–60 min) until a new driver arrives.     |
-| Level crossing | Short stop (e.g. 5–15 min).                                |
+| Drunk driver   | Long stop, random duration (e.g. 30–60 min) until a new driver arrives.     ||
 | Slow down      | Train moves at 50% speed on a section.                     |
-| Cancel         | Train is cancelled; passengers dropped (see Riding).       |
+| Cancel         | Train is cancelled; happens only right before its timetable start |
 
 - A cancelled train that has not departed yet shows "Cancelled" on the
   board and never arrives.
-- No more events are planned for now.
+- Codebase should be adjusted so that more events can be added without much effort
 
 ## Time reversal (rewind)
 - Only available in map view. To rewind while in a station, switch to map
@@ -184,15 +181,13 @@ your result worse.
     station you have since left.
 - No markers or ghosts after a rewind; the player only has their own memory.
 
-## Station view (top-down pixel art, WASD)
+## Station view (top-down, WASD)
 - Every time you get off a train you are in station view and walk to your
   next platform. Same rules for every station.
 - Camera follows the player.
 - Each station has one fixed entrance point (spawn point after a rewind and
   at run start).
-- Inside: walkable paths and platforms only (no crowds or obstacles).
-- No collisions for now; the player walks freely. Collisions are a future
-  task.
+- Inside: walkable paths from OSM data and platforms only (no crowds or obstacles). Movement based on path graph from an osm export.
 - Trains that stop at the station are visible at their platforms: arriving,
   waiting, leaving. Trains passing through without stopping are not shown.
 - Finding your train:
@@ -217,17 +212,14 @@ your result worse.
   up that history at the new time.
 - Fonts must render Polish characters (ą, ć, ę, ł, ń, ó, ś, ź, ż) for
   station names.
+- Rendering resolution: standard 1920x1080 with pixelart-compatible texture scaling
 
 ## Not decided yet
-- Rendering resolution: the project is set to 320×180 pixel art, but the
-  vector map with clickable stops may need a higher resolution.
 - Which lines/cities are on the map (real network size for the jam).
 - List of start cities (must fit the ~5-minute run target).
 - Map data source and file format.
-- Station layouts: OSM-based per station vs. one generic layout reused.
-- Size of the deadline buffer.
+- Size of the deadline buffer - make it a config constant
 - Zoom levels (min/max).
-- Walking speed and station size.
 - Exact stop lengths for events, slow-down section length.
 - Assets list for the artist, music and sound.
 
@@ -236,9 +228,7 @@ your result worse.
 - Single-track bottlenecks (trains blocking each other).
 - Reroute event (train takes a different path, skips some stops, still ends
   at its original terminus).
-- Train names/numbers.
 - Joke rating on the end screen.
-- Main menu, how-to-play screen, seed input.
 
 ## Team
 2-day jam. 3 people (lots of AI help for code), 1 artist. Keep art needs small.
