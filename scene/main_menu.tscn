@@ -55,3 +55,4 @@ stream = ExtResource("4_0iwki")
 autoplay = true
 
 [connection signal="button_down" from="ExitBtn" to="." method="_on_exit_btn_click"]
+[connection signal="pressed" from="StartBtn" to="." method="_on_start_btn_click"]
