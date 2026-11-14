@@ -2,6 +2,7 @@ extends SceneTree
 
 const Simulation = preload("res://scripts/cart_simulation.gd")
 const Game = preload("res://scene/game.tscn")
+const GameUI = preload("res://config/game_ui.tscn")
 
 var cases: Dictionary
 var checks := 0
@@ -434,7 +435,8 @@ func run() -> void:
 		check(sim.from_node == buffer and sim.to_node == neighbor, "Buffer reverses direction: " + buffer)
 		check(near(incoming_heading.dot(sim.heading()), -1.0), "Buffer exactly reverses heading: " + buffer)
 		check(near(sim.progress, half), "Buffer carries leftover distance: " + buffer)
-		check(not sim.is_locked(neighbor), "Buffer does not trap switch lock: " + buffer)
+		check(sim.rear_locks.is_empty(), "Buffer does not leave a stale rear lock: " + buffer)
+		check(sim.is_locked(neighbor) == (sim.edge_length() - sim.progress <= half), "Buffer return locks switch only on front contact: " + buffer)
 	# Starts cover exactly the four distinct sidings, with safe straight routing.
 	var start_tracks := {}
 	for index in range(config.starts.size()):
@@ -509,7 +511,18 @@ func run() -> void:
 		ProjectSettings.get_setting("display/window/size/viewport_height")))
 	for rect in bounds:
 		check(viewport.encloses(rect), "Drawn tracks, markers and hit areas fit viewport")
+	var ui_state: SceneState = GameUI.get_state()
+	var authored_labels := []
+	for index in range(ui_state.get_node_count()):
+		if ui_state.get_node_type(index) == &"Label":
+			authored_labels.append(str(ui_state.get_node_path(index)).trim_prefix("./"))
+	for path in ["HUDTitle", "Status", "Help", "LossOverlay/Panel/Title", "LossOverlay/Panel/Reason"]:
+		check(path in authored_labels, "PackedScene contains editor-authored label: " + path)
+	check(not FileAccess.get_file_as_string("res://scripts/game.gd").contains("Label.new("), "Game does not create runtime labels")
 	var game = Game.instantiate()
+	game.traffic.config.spawning_enabled = false
+	game.traffic.restart()
+	game.simulation.restart(0)
 	root.add_child(game)
 	var initial_position: Vector2 = game.simulation.cart_position()
 	await process_frame
@@ -517,9 +530,14 @@ func run() -> void:
 	check(game.simulation.cart_position() != initial_position, "Scene automatically advances cart")
 	game.set_process(false)
 	await process_frame
-	check(game.status.text == config.text.running, "Scene loads with prototype status")
-	for control in game.status.get_parent().get_children():
-		if control is Control:
+	check(game.simulation == game.traffic.cart, "Scene exposes the traffic cart as simulation")
+	check(game.traffic.elapsed > 0.0 and game.traffic.trains.is_empty() and game.traffic.warnings.is_empty(), "Automatic scene movement runs without train spawning")
+	check(game.status.text.contains("Elapsed: %.1fs" % game.traffic.elapsed) and game.status.text.contains("Trains: 0"), "Scene status shows elapsed time and train count")
+	check(not game.loss_overlay.visible and not game.restart_button.is_visible_in_tree() and not game.menu_button.is_visible_in_tree(), "Loss controls stay hidden during play")
+	var hud_controls: Array = game.status.get_parent().get_children()
+	hud_controls.append_array(game.get_node("CanvasLayer").get_children())
+	for control in hud_controls:
+		if control is Control and control != game.status.get_parent() and control != game.loss_overlay:
 			var ui_rect: Rect2 = control.get_global_rect()
 			if control is Label:
 				# Labels retain a taller pre-font minimum size; only their text is drawn.
@@ -530,6 +548,7 @@ func run() -> void:
 	var ui_incoming: String = cases.ui_incoming
 	var ui_exit: String = cases.ui_exit
 	for id in config.switches:
+		game.restart()
 		game.simulation.restart(0)
 		check(not game.simulation.is_locked(id), "Deterministic UI start leaves target unlocked: " + id)
 		var initial: int = game.simulation.switches[id]
@@ -543,31 +562,48 @@ func run() -> void:
 	var before: int = game.simulation.switches[ui_switch]
 	click(game.simulation.point(ui_switch))
 	check(game.simulation.switches[ui_switch] == before, "Mouse click respects overlap lock")
-	for button in [game.restart_button, game.menu_button]:
-		check(button.size.x >= button.get_minimum_size().x, "Button text fits")
-		for id in config.switches:
-			check(not button.get_rect().grow(config.visual.click_radius).has_point(sim.point(id)), "Buttons clear switch targets")
 	place(game.simulation, ui_switch, ui_exit, game.simulation.point(ui_switch).distance_to(game.simulation.point(ui_exit)) - half - cases.epsilon)
 	game.set_process(true)
 	await process_frame
 	await process_frame
-	check(game.simulation.lost and game.status.text == config.text.lost, "Automatic exit updates loss UI")
+	check(game.simulation.lost and game.traffic.lost and game.traffic.loss_reason == "cart_exit" and game.loss_overlay.visible, "Automatic cart exit ends traffic round and shows loss overlay")
+	for button in [game.restart_button, game.menu_button]:
+		check(button.is_visible_in_tree(), "Loss button appears after actual loss")
+		check(button.size.x >= button.get_minimum_size().x, "Button text fits")
+		check(viewport.encloses(button.get_global_rect()), "Nested loss button fits viewport")
 	var stopped_position: Vector2 = game.simulation.cart_position()
+	var stopped_elapsed: float = game.traffic.elapsed
 	await process_frame
-	check(game.simulation.cart_position() == stopped_position, "Lost scene stops cart movement")
+	check(game.simulation.cart_position() == stopped_position and game.traffic.elapsed == stopped_elapsed, "Lost scene stops cart movement and timer")
 	game.set_process(false)
 	game.simulation.switches[ui_switch] = 1
-	click(game.restart_button.get_rect().get_center())
-	check(not game.simulation.lost and game.simulation.switches[ui_switch] == int(config.switches[ui_switch].initial), "Restart button wired")
+	click(game.restart_button.get_global_rect().get_center())
+	check(not game.simulation.lost and not game.traffic.lost and not game.loss_overlay.visible, "Restart button resets loss and hides overlay")
+	check(game.traffic.elapsed == 0.0 and game.traffic.trains.is_empty() and game.traffic.warnings.is_empty(), "Restart resets traffic round state")
+	check(game.simulation.switches.size() == config.switches.size(), "Restart preserves all switches")
+	for id in config.switches:
+		check(game.simulation.switches[id] == int(config.switches[id].initial), "Retry resets switch: " + id)
+	game.simulation.restart(0)
+	place(game.simulation, ui_switch, ui_exit, game.simulation.point(ui_switch).distance_to(game.simulation.point(ui_exit)) - half - cases.epsilon)
+	game.set_process(true)
+	await process_frame
+	await process_frame
+	game.set_process(false)
+	check(game.traffic.lost and game.loss_overlay.visible and game.menu_button.is_visible_in_tree(), "Menu is available after another actual cart exit")
 	current_scene = game
-	click(game.menu_button.get_rect().get_center())
+	click(game.menu_button.get_global_rect().get_center())
 	await process_frame
 	await process_frame
 	check(current_scene != null and current_scene.scene_file_path == "res://scene/main_menu.tscn", "Menu button returns to existing menu")
+	current_scene.get_node("TomekIPrzyjaciele").stop()
+	await create_timer(cases.audio_cleanup_delay).timeout
 	var start_button: Control = current_scene.get_node("StartBtn")
+	check(start_button.size.x > 0.0 and start_button.size.y > 0.0, "Menu Start has a clickable area")
 	click(start_button.get_global_rect().get_center())
 	await process_frame
 	await process_frame
 	check(current_scene != null and current_scene.scene_file_path == "res://scene/game.tscn", "Menu Start opens prototype again")
+	current_scene.queue_free()
+	await process_frame
 	print("Cart prototype: %d checks, %d failures" % [checks, failures])
 	quit(1 if failures else 0)

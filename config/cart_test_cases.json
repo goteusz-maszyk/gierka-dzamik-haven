@@ -4,6 +4,7 @@
   "small_step": 0.025,
   "comparison_time": 20.0,
   "random_restarts": 200,
+  "audio_cleanup_delay": 0.1,
   "track_y": [40, 58, 76, 94, 112, 130],
   "left_x": 20,
   "right_x": 300,

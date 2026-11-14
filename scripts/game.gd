@@ -1,52 +1,62 @@
 extends Node2D
 
-const Simulation = preload("res://scripts/cart_simulation.gd")
+const Traffic = preload("res://scripts/traffic_simulation.gd")
+const CART_TEXTURE = preload("res://ciufa.png")
 const MENU_PATH = "res://scene/main_menu.tscn"
 
-var simulation = Simulation.new()
-var status: Label
-var restart_button: Button
-var menu_button: Button
+var traffic = Traffic.new()
+var simulation = traffic.cart
+var ui_config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/game_ui.json"))
+@onready var status: Label = $CanvasLayer/GameUI/Status
+@onready var restart_button: BaseButton = $CanvasLayer/GameUI/LossOverlay/Panel/Retry
+@onready var menu_button: BaseButton = $CanvasLayer/GameUI/LossOverlay/Panel/Menu
+@onready var loss_overlay: Control = $CanvasLayer/GameUI/LossOverlay
+@onready var loss_reason: Label = $CanvasLayer/GameUI/LossOverlay/Panel/Reason
+@onready var status_format: String = status.text
+@onready var loss_messages: Dictionary = {
+	"cart_exit": loss_reason.text,
+	"cart_train": loss_reason.get_meta("cart_train"),
+	"train_train": loss_reason.get_meta("train_train")
+}
 
 
 func _ready() -> void:
-	var visual: Dictionary = simulation.config.visual
-	var text: Dictionary = simulation.config.text
-	for key in ["title", "status", "help"]:
-		var label := Label.new()
-		var rect: Array = visual[key + "_rect"]
-		label.position = Vector2(rect[0], rect[1])
-		label.size = Vector2(rect[2], rect[3])
-		label.add_theme_font_size_override("font_size", int(visual.font_size))
-		label.add_theme_color_override("font_color", Color(visual.text))
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.text = text.running if key == "status" else text[key]
-		$CanvasLayer.add_child(label)
-		if key == "status":
-			status = label
+	_update_ui()
 
 
 func restart() -> void:
-	simulation.restart()
-	status.text = simulation.config.text.running
+	traffic.restart()
+	simulation = traffic.cart
+	loss_overlay.hide()
+	_update_ui()
 	queue_redraw()
 
 func give_up() -> void:
-	get_tree().change_scene_to_file("res://scene/main_menu.tscn")
+	get_tree().change_scene_to_file(MENU_PATH)
 
 
 func _process(delta: float) -> void:
-	simulation.advance(delta)
-	status.text = simulation.config.text.lost if simulation.lost else simulation.config.text.running
+	traffic.advance(delta)
+	_update_ui()
 	queue_redraw()
 
 
+func _update_ui() -> void:
+	status.text = status_format.format({"elapsed": "%.1f" % traffic.elapsed, "trains": traffic.trains.size()})
+	if traffic.lost and not loss_overlay.visible:
+		loss_reason.text = loss_messages[traffic.loss_reason]
+		loss_overlay.show()
+		restart_button.grab_focus()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if traffic.lost or loss_overlay.visible:
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var local_click: Vector2 = get_global_transform_with_canvas().affine_inverse() * event.position
 		for id in simulation.switches:
 			if local_click.distance_to(simulation.point(id)) <= simulation.config.visual.click_radius:
-				simulation.toggle(id)
+				traffic.toggle(id)
 				get_viewport().set_input_as_handled()
 				queue_redraw()
 				return
@@ -72,13 +82,23 @@ func _draw() -> void:
 		draw_circle(simulation.point(id), v.exit_radius, Color(v.exit))
 	for id in simulation.switches:
 		var center: Vector2 = simulation.point(id)
-		var color := Color(v.locked if simulation.is_locked(id) else v.switch)
+		var color := Color(v.locked if traffic.is_locked(id) else v.switch)
 		draw_circle(center, v.switch_radius, color)
 		var ports: Array = config.switches[id].ports
 		for neighbor in [ports[0], ports[1 + simulation.switches[id]]]:
 			var tip: Vector2 = center + (simulation.point(neighbor) - center).normalized() * v.route_arm
 			draw_line(center, tip, Color(v.route), v.route_width)
-	var half_cart: Vector2 = simulation.heading() * config.cart_length / 2.0
-	var position_on_track: Vector2 = simulation.cart_position()
-	draw_line(position_on_track - half_cart, position_on_track + half_cart, Color(v.cart), config.cart_width)
-	draw_circle(position_on_track + half_cart, v.cart_front_radius, Color(v.cart_front))
+	var cart_size := Vector2(config.cart_length, config.cart_width)
+	draw_set_transform(simulation.cart_position(), simulation.heading().angle())
+	draw_texture_rect(CART_TEXTURE, Rect2(-cart_size / 2.0, cart_size), false, Color(ui_config.cart_modulate))
+	for train in traffic.trains:
+		var train_size := Vector2(train.config.cart_length, train.config.cart_width)
+		draw_set_transform(train.cart_position(), train.heading().angle())
+		draw_rect(Rect2(-train_size / 2.0, train_size), Color(ui_config.train_color))
+		var front_x: float = train_size.x / 2.0 - ui_config.train_front_width / 2.0
+		draw_line(Vector2(front_x, -train_size.y / 2.0), Vector2(front_x, train_size.y / 2.0),
+			Color(ui_config.train_front_color), ui_config.train_front_width)
+	draw_set_transform(Vector2.ZERO)
+	for warning in traffic.warnings:
+		draw_circle(simulation.point(warning.entry), ui_config.warning_radius,
+			Color(ui_config.warning_color), false, ui_config.warning_width)

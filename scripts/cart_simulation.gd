@@ -9,12 +9,13 @@ var from_node: String
 var to_node: String
 var progress: float
 var lost := false
+var exits_safely := false
 var start_index: int
 var rng := RandomNumberGenerator.new()
 
 
-func _init() -> void:
-	config = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
+func _init(vehicle_config: Dictionary = {}) -> void:
+	config = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH)) if vehicle_config.is_empty() else vehicle_config
 	rng.randomize()
 	restart()
 
@@ -72,19 +73,30 @@ func route(id: String, incoming: String) -> String:
 func advance(delta: float) -> void:
 	if lost or delta <= 0.0 or not is_finite(delta):
 		return
-	var remaining: float = delta * config.speed
-	while remaining > 0.0 and not lost:
-		var length := edge_length()
+	advance_distance(delta * config.speed)
+
+
+func distance_to_event() -> float:
+	var end_progress := edge_length()
+	if to_node in config.exits:
+		end_progress += config.cart_length / 2.0 * (1.0 if exits_safely else -1.0)
+	return maxf(0.0, end_progress - progress)
+
+
+func advance_distance(remaining: float) -> void:
+	if lost or remaining < 0.0 or not is_finite(remaining):
+		return
+	while not lost:
 		var is_exit: bool = to_node in config.exits
-		var end_progress: float = length - config.cart_length / 2.0 if is_exit else length
-		var travel := minf(remaining, maxf(0.0, end_progress - progress))
+		var distance := distance_to_event()
+		var travel := minf(remaining, distance)
 		progress += travel
 		remaining -= travel
 		for id in rear_locks.keys():
 			rear_locks[id] -= travel
 			if rear_locks[id] <= 0.0:
 				rear_locks.erase(id)
-		if progress < end_progress:
+		if travel < distance:
 			break
 		if is_exit:
 			lost = true
@@ -97,3 +109,5 @@ func advance(delta: float) -> void:
 			rear_locks[arrived] = config.cart_length / 2.0
 		from_node = arrived
 		progress = 0.0
+		if remaining <= 0.0:
+			break

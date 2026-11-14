@@ -1,0 +1,114 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Theme" path="res://config/game_ui.tres" id="1_theme"]
+[ext_resource type="PackedScene" path="res://scene/button.tscn" id="2_button"]
+
+[node name="GameUI" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("1_theme")
+
+[node name="HUDTitle" type="Label" parent="."]
+layout_mode = 0
+offset_left = 6.0
+offset_right = 314.0
+offset_bottom = 13.0
+mouse_filter = 2
+text = "prototype: trains / WIP junction layout"
+
+[node name="Status" type="Label" parent="."]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 147.0
+offset_right = 256.0
+offset_bottom = 160.0
+mouse_filter = 2
+text = "Elapsed: {elapsed}s | Trains: {trains}"
+
+[node name="Help" type="Label" parent="."]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 161.0
+offset_right = 256.0
+offset_bottom = 174.0
+mouse_filter = 2
+text = "Click circles. Orange = vehicle lock."
+
+[node name="LossOverlay" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Shade" type="ColorRect" parent="LossOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0.7)
+
+[node name="Panel" type="Panel" parent="LossOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -112.0
+offset_top = -49.0
+offset_right = 112.0
+offset_bottom = 49.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="LossOverlay/Panel"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 7.0
+offset_right = 216.0
+offset_bottom = 20.0
+mouse_filter = 2
+text = "ROUND LOST"
+horizontal_alignment = 1
+
+[node name="Reason" type="Label" parent="LossOverlay/Panel"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 24.0
+offset_right = 216.0
+offset_bottom = 56.0
+mouse_filter = 2
+text = "The cart left the station."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+metadata/cart_train = "The cart collided with a train."
+metadata/train_train = "Two trains collided."
+
+[node name="Retry" parent="LossOverlay/Panel" instance=ExtResource("2_button")]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 62.0
+offset_right = 96.0
+offset_bottom = 90.0
+text = "Retry"
+
+[node name="Menu" parent="LossOverlay/Panel" instance=ExtResource("2_button")]
+layout_mode = 0
+offset_left = 128.0
+offset_top = 62.0
+offset_right = 184.0
+offset_bottom = 90.0
+text = "Menu"

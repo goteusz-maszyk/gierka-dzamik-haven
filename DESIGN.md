@@ -103,7 +103,7 @@ Dokladna krzywa czestotliwosci spawnu, poczatkowe i koncowe odstepy oraz predkos
 
 Za zgoda autora prototyp moze korzystac z natywnych linii, figur i tekstu Godota jako tymczasowej wizualizacji. Nie generujemy plikow graficznych ani audio. Docelowe assety nadal pochodza od artysty.
 
-Pierwszy etap obejmuje tylko wagonik, zwrotnice, odbijaki, przegrana po wyjezdzie, restart i powrot do menu. Nie zawiera jeszcze pociagow ani 67-sekundowej rundy.
+Prototyp obejmuje wagonik, zwrotnice, odbijaki, pociagi z zapowiedziami wjazdu i kolizjami, ekran przegranej, restart i powrot do menu. Nie zawiera jeszcze wygranej po 67 sekundach: licznik pokazuje czas od rozpoczecia proby, a 67 sekund jest horyzontem skalowania spawnu, nie koncem rundy.
 
 Scena `scene/game.tscn` jest dostepna przez Start w istniejacym menu. Uklad znajduje sie w `config/cart_prototype.json`: szesc poziomych, rownoleglych torow biegnie od lewej do prawej przez szerokosc planszy. Dwa srodkowe maja otwarte konce, pozostale cztery maja po dwa odbijaki. Cztery krotkie dojazdy lacza sie ze skrajnymi torami bocznymi pod katem 30 stopni do poziomu: dwa u gory i dwa u dolu, od lewej i od prawej. Razem z koncami torow glownych daje to osiem otwartych wyjazdow.
 
@@ -111,14 +111,25 @@ Kazda sasiednia para rownoleglych torow ma dwa ukosne przejscia. Przejscia sa ro
 
 W prototypie zwrotnica ma trzy dojscia: wspolne, proste i odgalezienie. Ustawienie wybiera wyjazd ze wspolnego dojscia. Wjazd z kazdego z pozostalych dojsc prowadzi na wspolne, bez zawracania. Blokada trwa od dotarcia przodu wagonika do zwrotnicy do opuszczenia jej przez tyl. Dotarcie przodu wagonika do otwartego konca oznacza przegrana.
 
+### Pociagi i interfejs prototypu
+
+- `ciufa.png` jest grafika wagonika gracza. Pociagi pozostaja tymczasowymi prostokatami Godota o innym kolorze; nie wykorzystuja tej grafiki.
+- HUD i ekran przegranej sa rzeczywistymi wezlami sceny `config/game_ui.tscn`, instancjonowanymi w `scene/game.tscn`. Mozna edytowac je w Godocie; kod nie tworzy etykiet ani przyciskow w trakcie gry. Motyw jest w `config/game_ui.tres`, wyglad ostrzezen i pojazdow w `config/game_ui.json`.
+- Ekran przegranej pokazuje powod: wyjazd wagonika, kolizja wagonika z pociagiem albo kolizja dwoch pociagow. Nakladka blokuje klikniecia planszy, zatrzymana symulacja nie porusza pojazdow ani nie spawnuje kolejnych. Przyciski Retry i Menu korzystaja z istniejacej grafiki przyciskow. Give Up pozostaje dostepny podczas rozgrywki.
+- Kazdy z osmiu otwartych koncow jest potencjalnym wjazdem pociagu. Wjazd jest losowany z jednakowym prawdopodobienstwem, a nastepnie oznaczany zoltym pierscieniem przed spawnem.
+- Aktywna jest najwyzej jedna zapowiedz. Po uplywie czasu ostrzezenia pociag czeka, jezeli jego docelowy obrys pokrywalby sie z dowolnym pojazdem. Ostrzezenie pozostaje widoczne; nie powstaje kolejka kolejnych zapowiedzi. Odstep do nastepnej zapowiedzi jest odmierzany dopiero po udanym spawnie.
+- Parametry pociagow i spawnu pochodza z `config/traffic.json`. Poczatkowe wartosci sa robocze, do balansu: pierwsze ostrzezenie po 2 sekundach, zapowiedz 1,5 sekundy, odstep miedzy spawnem i kolejna zapowiedzia maleje liniowo od 7 do 2,5 sekundy w ciagu 67 sekund. Predkosc pociagow pozostaje stala.
+- Wszystkie pojazdy korzystaja z jednego ustawienia zwrotnic. Zajecie zwrotnicy przez dowolny pojazd blokuje jej przelaczenie; wyjazd jednego pojazdu nie zwalnia blokady utrzymywanej przez inny.
+- Pociag znika dopiero po opuszczeniu otwartego konca przez caly jego obrys. Wyjazd pociagu nie oznacza przegranej.
+- Na potrzeby prototypu pojazd ma sztywny prostokatny obrys, obracany przy przejsciu na nowy odcinek; nie jest jeszcze lancuchem osobnych wagonow. Zetkniecie obrysow jest kolizja. Ruch pojazdow jest zsynchronizowany, a wykrywanie kolizji sprawdza cala droge miedzy zdarzeniami, nie tylko pozycje na koncu klatki.
+- Restart zeruje czas, pociagi, zapowiedz, harmonogram spawnu i powod przegranej oraz odtwarza ustawienia zwrotnic i losuje start wagonika.
+
 ## Otwarte decyzje
 
 Ponizsze szczegoly nie sa jeszcze uzgodnionymi zasadami i wymagaja ustalenia przed implementacja danej mechaniki:
 
 - Jednoznaczna lista polaczen na podstawie czytelniejszego schematu: identyfikatory zwrotnic, ich mozliwe trasy i zachowanie przy wjezdzie z kazdej strony. Obecny szkic ma 100 x 100 pikseli i nie rozstrzyga tych szczegolow.
 - Konkretny zestaw bezpiecznych pozycji startowych, kierunkow i poczatkowych ustawien zwrotnic, po ustaleniu polaczen planszy.
-- Sposob wyboru wejsc spawnu pociagow oraz obsluga kolejnych zapowiedzi, gdy poprzedni spawn nadal czeka na wolne miejsce.
-- Forma wizualna ostrzezenia o nadjezdzajacym pociagu.
 - Wartosci predkosci, odstepow spawnu, czasu ostrzezenia i ksztalt krzywej trudnosci.
 
 ## Kryteria weryfikacji MVP

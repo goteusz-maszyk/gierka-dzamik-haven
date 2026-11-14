@@ -1,13 +1,12 @@
 @tool
 extends TextureButton
 
-@export var text: String
+@export var text: String:
+	set(value):
+		text = value
+		if is_node_ready():
+			$BoxContainer/Label.text = text
 
-# Called when the node enters the scene tree for the first time.
 func _ready() -> void:
+	custom_minimum_size = Vector2(get_theme_constant("minimum_width"), get_theme_constant("minimum_height"))
 	$BoxContainer/Label.text = text
-
-
-# Called every frame. 'delta' is the elapsed time since the previous frame.
-func _process(delta: float) -> void:
-	pass

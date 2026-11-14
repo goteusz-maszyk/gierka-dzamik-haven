@@ -1,7 +1,7 @@
 {
   "topology_note": "WIP: provisional cascading junction layout, not a faithful final map",
   "speed": 22.0,
-  "cart_length": 8.0,
+  "cart_length": 10.0,
   "cart_width": 4.0,
   "approach_angle_degrees": 30,
   "nodes": {
@@ -80,21 +80,10 @@
   "visual": {
 	"background": "17212b", "track": "6e8291", "route": "f7d66d",
 	"switch": "263c4c", "locked": "ef8d57", "buffer": "83dba1",
-	"exit": "f17b83", "cart": "f5f3e8", "cart_front": "83dba1", "text": "eef2f5",
-	"cart_front_radius": 2.0,
+	"exit": "f17b83",
 	"track_width": 2.0, "route_width": 2.0,
 	"switch_radius": 4.5, "click_radius": 8.0,
 	"route_arm": 7.0, "buffer_half_width": 6.0,
-	"buffer_width": 3.0, "exit_radius": 2.0,
-	"font_size": 9, "button_font_size": 10,
-	"title_rect": [6, 0, 308, 13],
-	"status_rect": [6, 147, 202, 13],
-	"help_rect": [6, 161, 202, 13],
-  },
-  "text": {
-	"title": "prototype: cart and switches",
-	"running": "Keep the cart inside. No timer / trains.",
-	"lost": "LOST: cart left the station.",
-	"help": "Click circles. Orange = cart lock."
+	"buffer_width": 3.0, "exit_radius": 2.0
   }
 }

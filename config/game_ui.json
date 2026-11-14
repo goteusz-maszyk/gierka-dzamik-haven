@@ -1,0 +1,9 @@
+{
+  "warning_radius": 4.0,
+  "warning_width": 1.5,
+  "warning_color": "f7d66d",
+  "cart_modulate": "ffffff",
+  "train_color": "f17b83",
+  "train_front_color": "f7d66d",
+  "train_front_width": 1.0
+}
