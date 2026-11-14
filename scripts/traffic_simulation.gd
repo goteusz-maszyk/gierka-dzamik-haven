@@ -3,18 +3,25 @@ extends RefCounted
 const Simulation = preload("res://scripts/cart_simulation.gd")
 const CONFIG_PATH = "res://config/traffic.json"
 
-var cart = Simulation.new()
+var cart
 var trains: Array = []
 var config: Dictionary
 var elapsed := 0.0
 var lost := false
+var won := false
 var loss_reason := ""
 var warnings: Array = []
 var rng := RandomNumberGenerator.new()
 var _until_warning: float
+var _scheduler_at := 0.0
+var _warning_at := INF
+var _announcement_at := INF
 
 
-func _init() -> void:
+func _init(initialize: bool = true) -> void:
+	if not initialize:
+		return
+	cart = Simulation.new()
 	config = JSON.parse_string(FileAccess.get_file_as_string(CONFIG_PATH))
 	rng.randomize()
 	restart()
@@ -25,8 +32,12 @@ func restart() -> void:
 	warnings.clear()
 	elapsed = 0.0
 	lost = false
+	won = false
 	loss_reason = ""
 	_until_warning = config.first_warning_delay
+	_scheduler_at = _until_warning
+	_announcement_at = _scheduler_at
+	_warning_at = INF
 	cart.restart()
 
 
@@ -39,8 +50,12 @@ func is_locked(id: String) -> bool:
 	return false
 
 
+func remaining_time() -> float:
+	return maxf(0.0, config.round_duration - elapsed)
+
+
 func toggle(id: String) -> bool:
-	if lost or not cart.switches.has(id) or is_locked(id):
+	if lost or won or not cart.switches.has(id) or is_locked(id):
 		return false
 	cart.switches[id] = 1 - cart.switches[id]
 	return true
@@ -70,13 +85,17 @@ func _contact_interval(a, b, velocity_a: Vector2, velocity_b: Vector2, duration:
 	var bh: Vector2 = b.heading()
 	var ap := ah.orthogonal()
 	var bp := bh.orthogonal()
-	var offset: Vector2 = b.cart_position() - a.cart_position()
+	# Keep longitudinal arithmetic in doubles, not Vector2's single precision.
+	var ax: float = a.point(a.from_node).x + ah.x * a.progress
+	var ay: float = a.point(a.from_node).y + ah.y * a.progress
+	var bx: float = b.point(b.from_node).x + bh.x * b.progress
+	var by: float = b.point(b.from_node).y + bh.y * b.progress
 	var velocity := velocity_b - velocity_a
 	var enter := 0.0
 	var leave := duration
 	for axis in [ah, ap, bh, bp]:
 		var radius: float = (absf(axis.dot(ah)) * a.config.cart_length + absf(axis.dot(ap)) * a.config.cart_width + absf(axis.dot(bh)) * b.config.cart_length + absf(axis.dot(bp)) * b.config.cart_width) / 2.0 + margin
-		var separation: float = offset.dot(axis)
+		var separation: float = (bx - ax) * axis.x + (by - ay) * axis.y
 		var speed: float = velocity.dot(axis)
 		if speed == 0.0:
 			if absf(separation) > radius:
@@ -95,62 +114,203 @@ func _velocity(vehicle) -> Vector2:
 	return vehicle.heading() * vehicle.config.speed
 
 
-func advance(delta: float) -> void:
-	if lost or delta <= 0.0 or not is_finite(delta):
-		return
-	var remaining := delta
-	while not lost:
-		var vehicles: Array = [cart] + trains
-		var step := remaining
-		for vehicle in vehicles:
-			if vehicle.config.speed > 0.0:
-				step = minf(step, vehicle.distance_to_event() / vehicle.config.speed)
-		var spawning: bool = config.spawning_enabled
-		if spawning:
-			if warnings.is_empty():
-				step = minf(step, maxf(0.0, _until_warning))
-			elif warnings[0].remaining > 0.0:
-				step = minf(step, warnings[0].remaining)
-			else:
-				var candidate = _entry_train(warnings[0].entry)
-				var occupied := false
-				var clearance := 0.0
-				for vehicle in vehicles:
-					if _contact_interval(candidate, vehicle, Vector2.ZERO, Vector2.ZERO, 0.0)[0] == 0.0:
-						occupied = true
-						var interval := _contact_interval(candidate, vehicle, Vector2.ZERO, _velocity(vehicle), step, config.spawn_clearance)
-						clearance = maxf(clearance, interval[1])
-				if not occupied:
-					trains.append(candidate)
-					warnings.clear()
-					_until_warning = lerpf(config.initial_interval, config.final_interval, clampf(elapsed / config.scaling_horizon, 0.0, 1.0))
+func _copy_vehicle(vehicle, switches: Dictionary):
+	var copy = Simulation.new(vehicle.config.duplicate())
+	copy.switches = switches
+	copy.rear_locks = vehicle.rear_locks.duplicate()
+	copy.from_node = vehicle.from_node
+	copy.to_node = vehicle.to_node
+	copy.progress = vehicle.progress
+	copy.lost = vehicle.lost
+	copy.exits_safely = vehicle.exits_safely
+	return copy
+
+
+func _footprint_clear(candidate) -> bool:
+	for vehicle in [cart] + trains:
+		if _contact_interval(candidate, vehicle, Vector2.ZERO, Vector2.ZERO, 0.0)[0] == 0.0:
+			return false
+	return true
+
+
+func _forecast():
+	var forecast = get_script().new(false)
+	forecast.config = config.duplicate()
+	forecast.elapsed = elapsed
+	forecast.cart = _copy_vehicle(cart, cart.switches.duplicate())
+	for train in trains:
+		forecast.trains.append(_copy_vehicle(train, forecast.cart.switches))
+	return forecast
+
+
+func _entry_safe(entry: String, lead: float, defer_conflicting: bool = false) -> bool:
+	var forecast = _forecast()
+	var plans: Array = [{"entry": entry, "at": elapsed + lead, "candidate": true}]
+	var latest := elapsed + lead
+	for warning in warnings:
+		if warning.entry == entry:
+			continue
+		var at: float = maxf(elapsed, warning.get("check_at", elapsed + warning.remaining))
+		plans.append({"entry": warning.entry, "at": at, "candidate": false})
+		latest = maxf(latest, at)
+	plans.sort_custom(func(a, b): return a.at < b.at or (a.at == b.at and a.candidate and not b.candidate))
+	for plan in plans:
+		forecast._advance_to(minf(config.round_duration, plan.at), false)
+		if forecast.lost:
+			return false
+		if forecast.won:
+			return true
+		var candidate = forecast._entry_train(plan.entry)
+		if forecast._footprint_clear(candidate):
+			if defer_conflicting and not plan.candidate:
+				# A due spawn has priority over an incompatible hypothetical arrival.
+				# Its later retry will see the admitted train as actual traffic.
+				var joint = forecast._forecast()
+				joint.trains.append(joint._entry_train(plan.entry))
+				joint._advance_to(minf(config.round_duration, latest + config.safety_duration), false)
+				if joint.lost:
 					continue
-				if clearance > 0.0:
-					step = minf(step, clearance)
+			forecast.trains.append(candidate)
+		elif plan.candidate:
+			return false
+	forecast._advance_to(minf(config.round_duration, latest + config.safety_duration), false)
+	return not forecast.lost
+
+
+func _pressure_weight(entry: String) -> float:
+	var rows: Array = []
+	for track in cart.config.get("tracks", []):
+		if cart.from_node in track.nodes or cart.to_node in track.nodes:
+			rows.append(track.nodes)
+	var candidate = _entry_train(entry)
+	candidate.switches = cart.switches.duplicate()
+	# The horizon is train travel time, excluding the warning lead.
+	var remaining: float = config.pressure_horizon * candidate.config.speed
+	while not candidate.lost:
+		for row in rows:
+			if candidate.from_node in row:
+				return config.pressure_weight
 		if remaining <= 0.0:
 			break
+		var distance: float = candidate.distance_to_event()
+		var travel := minf(remaining, distance)
+		candidate.advance_distance(travel)
+		remaining -= travel
+		if travel < distance:
+			break
+	return 1.0
+
+
+func _warning_limit() -> int:
+	return int(config.initial_max_warnings) if elapsed < config.double_warning_after else int(config.max_warnings)
+
+
+func _sync_schedule() -> void:
+	_warning_at = INF
+	_scheduler_at = _announcement_at if warnings.size() < _warning_limit() else INF
+	if not lost and not won and elapsed < config.double_warning_after:
+		_scheduler_at = minf(_scheduler_at, config.double_warning_after)
+	for warning in warnings:
+		warning.remaining = maxf(0.0, warning.spawn_at - elapsed)
+		_warning_at = minf(_warning_at, warning.spawn_at)
+		_scheduler_at = minf(_scheduler_at, warning.check_at)
+	_until_warning = maxf(0.0, _scheduler_at - elapsed)
+
+
+func _schedule() -> void:
+	if lost or won:
+		return
+	for warning in warnings:
+		if not warning.has("spawn_at"):
+			warning.spawn_at = elapsed + warning.remaining
+		if not warning.has("check_at"):
+			warning.check_at = warning.spawn_at
+	for warning in warnings.duplicate():
+		if elapsed < warning.check_at:
+			continue
+		var candidate = _entry_train(warning.entry)
+		if _footprint_clear(candidate) and _entry_safe(warning.entry, 0.0, true):
+			trains.append(candidate)
+			warnings.erase(warning)
+			_announcement_at = elapsed + lerpf(config.initial_interval, config.final_interval, clampf(elapsed / config.scaling_horizon, 0.0, 1.0))
+		else:
+			warning.check_at = elapsed + config.retry_interval
+	var announced := 0
+	while warnings.size() < _warning_limit() and elapsed >= _announcement_at:
+		var arrival: float = elapsed + config.warning_duration + announced * config.warning_stagger
+		for warning in warnings:
+			arrival = maxf(arrival, warning.check_at + config.warning_stagger)
+		var eligible: Array = []
+		var weights: Array[float] = []
+		var total := 0.0
+		for entry in cart.config.exits:
+			var pending := false
+			for warning in warnings:
+				if warning.entry == entry:
+					pending = true
+			if not pending and _entry_safe(entry, arrival - elapsed):
+				eligible.append(entry)
+				var weight := _pressure_weight(entry)
+				weights.append(weight)
+				total += weight
+		if eligible.is_empty():
+			_announcement_at = elapsed + config.retry_interval
+			break
+		var draw := rng.randf() * total
+		var chosen: String = eligible.back()
+		for i in range(eligible.size()):
+			draw -= weights[i]
+			if draw < 0.0:
+				chosen = eligible[i]
+				break
+		warnings.append({"entry": chosen, "remaining": arrival - elapsed, "spawn_at": arrival, "check_at": arrival})
+		announced += 1
+	_sync_schedule()
+
+
+func advance(delta: float) -> void:
+	if lost or won or delta <= 0.0 or not is_finite(delta):
+		return
+	_advance_to(minf(config.round_duration, elapsed + delta), config.spawning_enabled)
+
+
+func _advance_to(deadline: float, spawning: bool) -> void:
+	while not lost and not won:
+		if elapsed >= config.round_duration:
+			won = true
+			warnings.clear()
+			_announcement_at = INF
+			_sync_schedule()
+			break
+		if spawning:
+			_schedule()
+		if elapsed >= deadline:
+			break
+		var vehicles: Array = [cart] + trains
+		var event_at := deadline
+		for vehicle in vehicles:
+			if vehicle.config.speed > 0.0:
+				event_at = minf(event_at, elapsed + vehicle.distance_to_event() / vehicle.config.speed)
+		if spawning:
+			event_at = minf(event_at, _scheduler_at)
+		var step := maxf(0.0, event_at - elapsed)
 		var collision := ""
 		for i in range(vehicles.size()):
 			for j in range(i + 1, vehicles.size()):
 				var interval := _contact_interval(vehicles[i], vehicles[j], _velocity(vehicles[i]), _velocity(vehicles[j]), step)
 				if interval[0] <= step:
 					step = interval[0]
+					event_at = elapsed + step
 					collision = "cart_train" if i == 0 else "train_train"
 		for vehicle in vehicles:
 			var distance: float = vehicle.distance_to_event()
 			var travel: float = step * vehicle.config.speed
-			if vehicle.config.speed > 0.0 and distance / vehicle.config.speed <= step:
+			if vehicle.config.speed > 0.0 and elapsed + distance / vehicle.config.speed <= event_at:
 				travel = distance
 			vehicle.advance_distance(travel)
-		elapsed += step
-		remaining -= step
+		elapsed = event_at
 		if spawning:
-			if warnings.is_empty():
-				_until_warning -= step
-				if _until_warning <= 0.0:
-					warnings.append({"entry": cart.config.exits[rng.randi_range(0, cart.config.exits.size() - 1)], "remaining": config.warning_duration})
-			else:
-				warnings[0].remaining = maxf(0.0, warnings[0].remaining - step)
+			_sync_schedule()
 		if not collision.is_empty() or cart.lost:
 			lost = true
 			loss_reason = collision if not collision.is_empty() else "cart_exit"
@@ -165,3 +325,7 @@ func advance(delta: float) -> void:
 					if _contact_interval(vehicles[i], vehicles[j], Vector2.ZERO, Vector2.ZERO, 0.0)[0] == 0.0:
 						lost = true
 						loss_reason = "cart_train" if i == 0 else "train_train"
+	if lost:
+		warnings.clear()
+		_announcement_at = INF
+		_sync_schedule()

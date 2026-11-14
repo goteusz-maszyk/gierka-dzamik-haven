@@ -1,0 +1,46 @@
+{
+  "bulk_delta": 100.0,
+  "small_step": 0.05,
+  "maximum_observation_step": 0.05,
+  "epsilon": 0.0001,
+  "cart_seed": 12345,
+  "minimum_spawns": 2,
+  "expected": {
+    "round_duration": 67.0,
+    "scaling_horizon": 67.0,
+    "first_warning_delay": 2.0,
+    "initial_interval": 3.0,
+    "final_interval": 0.8,
+    "warning_duration": 1.5,
+    "max_warnings": 2,
+    "warning_stagger": 0.4,
+    "pressure_weight": 6.0,
+    "pressure_horizon": 10.0,
+    "safety_duration": 2.0,
+    "retry_interval": 0.1,
+    "spawning_enabled": true
+  },
+  "selection_note": "Topology-updated fixtures retain every original seed group and start, including losses. Late-phase cases are fresh production starts at the specified elapsed time, not full-round survivors; only the clock and initial scheduler deadline are shifted.",
+  "winning_trace": {
+    "seed": 5,
+    "start": 0,
+    "elapsed": 0.0,
+    "warnings": 20,
+    "spawns": 20,
+    "policy_note": "Legacy trace: invalid under the two-warning production defaults and intentionally still fails the full-round winning assertions. Replacement remains unresolved after bounded crossover and T2-refuge searches; these events and counts are not new-default winning proof.",
+    "events": [
+      [0.0, "T1_52"], [0.0, "T2_52"], [0.0, "T2_102"],
+      [0.0, "T3_52"], [0.0, "T3_102"], [0.0, "T4_52"],
+      [0.0, "T4_102"], [0.0, "T5_52"], [0.0, "T5_102"],
+      [0.0, "T6_right_switch"], [7.9, "T4_102"], [8.8, "T5_102"],
+      [30.0, "T4_52"], [35.5, "T5_102"], [35.6, "T5_52"],
+      [41.8, "T6_88"], [43.8, "T6_88"], [60.0, "T5_102"]
+    ]
+  },
+  "groups": [
+    {"seed": 1, "starts": [0, 1, 2, 3], "elapsed": 0.0, "spawns": [2, 4, 6, 2], "outcomes": ["train_train", "cart_train", "cart_train", "train_train"], "terminal_times": [8.929675888866, 14.113961219788, 16.092830101649, 8.929675888866]},
+    {"seed": 7, "starts": [0, 1, 2, 3], "elapsed": 0.0, "spawns": [2, 4, 4, 4], "outcomes": ["cart_train", "train_train", "train_train", "cart_train"], "terminal_times": [6.604166626930, 11.239816303100, 14.470585460510, 13.904166626930]},
+    {"seed": 118, "starts": [0, 1, 2, 3], "elapsed": 0.0, "spawns": [2, 4, 4, 4], "outcomes": ["cart_train", "train_train", "train_train", "train_train"], "terminal_times": [6.820833293597, 11.239816303100, 11.239816303100, 11.239816303100]},
+    {"seed": 1, "starts": [0, 1, 2, 3], "elapsed": 55.0, "spawns": [4, 6, 6, 4], "outcomes": ["train_train", "train_train", "cart_train", "train_train"], "terminal_times": [63.929675888866, 66.771121270799, 66.951640048760, 63.929675888866]}
+  ]
+}

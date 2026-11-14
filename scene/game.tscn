@@ -21,5 +21,7 @@ text = "Give Up"
 [connection signal="button_down" from="CanvasLayer/GiveUpBtn" to="." method="give_up"]
 [connection signal="pressed" from="CanvasLayer/GameUI/LossOverlay/Panel/Retry" to="." method="restart"]
 [connection signal="pressed" from="CanvasLayer/GameUI/LossOverlay/Panel/Menu" to="." method="give_up"]
+[connection signal="pressed" from="CanvasLayer/GameUI/WinOverlay/Panel/Retry" to="." method="restart"]
+[connection signal="pressed" from="CanvasLayer/GameUI/WinOverlay/Panel/Menu" to="." method="give_up"]
 
 [editable path="CanvasLayer/GameUI"]

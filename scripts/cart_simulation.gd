@@ -51,7 +51,7 @@ func restart(chosen_start: int = -1) -> void:
 
 
 func is_locked(id: String) -> bool:
-	return rear_locks.has(id) or (to_node == id and edge_length() - progress <= config.cart_length / 2.0)
+	return switches.has(id) and (rear_locks.has(id) or (to_node == id and edge_length() - progress <= config.cart_length / 2.0))
 
 
 func toggle(id: String) -> bool:
@@ -64,9 +64,10 @@ func toggle(id: String) -> bool:
 func route(id: String, incoming: String) -> String:
 	# Ports are [stem, straight, branch]. Both trailing entries go to the stem;
 	# the selected setting only chooses the stem's departure, never a U-turn.
-	var ports: Array = config.switches[id].ports
+	var active := switches.has(id)
+	var ports: Array = config.switches[id].ports if active else config.merges[id].ports
 	if incoming == ports[0]:
-		return ports[1 + switches[id]]
+		return ports[1 + switches[id]] if active else ports[1]
 	return ports[0]
 
 
@@ -106,7 +107,8 @@ func advance_distance(remaining: float) -> void:
 			to_node = from_node
 		else:
 			to_node = route(arrived, from_node)
-			rear_locks[arrived] = config.cart_length / 2.0
+			if switches.has(arrived):
+				rear_locks[arrived] = config.cart_length / 2.0
 		from_node = arrived
 		progress = 0.0
 		if remaining <= 0.0:

@@ -1,0 +1,35 @@
+{
+  "epsilon": 0.000001,
+  "step": 0.01,
+  "seed": 12345,
+  "draws": 600,
+  "minimum_pressure_gain": 150,
+  "comparison_time": 8.0,
+  "blocker_progress": 40.0,
+  "buffer_progress": 30.0,
+  "tangent_progress": 20.0,
+  "guard_exit_x": 600.0,
+  "later_arrival": 3.0,
+  "near_retry": 5.0,
+  "far_retry": 10.0,
+  "deadline_window": 1.0,
+  "train": {"speed": 100.0, "cart_length": 20.0, "cart_width": 4.0},
+  "vehicle": {
+    "nodes": {
+      "L": [0, 0], "J": [100, 0], "R": [300, 0], "B": [140, 40],
+      "U": [0, 100], "M": [50, 100], "V": [10000, 100],
+      "W": [0, 200], "Z": [10000, 200],
+      "P": [20000, 100], "Q": [30000, 100]
+    },
+    "edges": [["L", "J"], ["J", "R"], ["J", "B"], ["U", "M"], ["M", "V"], ["W", "Z"], ["P", "Q"]],
+    "tracks": [{"nodes": ["L", "J", "R"]}, {"nodes": ["U", "M", "V", "P", "Q"]}, {"nodes": ["W", "Z"]}],
+    "switches": {"J": {"ports": ["L", "R", "B"], "initial": 0}},
+    "merges": {"M": {"ports": ["V", "U", "B"]}},
+    "buffers": ["B", "P", "Q", "L", "R", "U", "V", "W", "Z"],
+    "exits": ["L", "R", "U", "V", "W", "Z"],
+    "starts": [{"from": "P", "to": "Q", "progress": 100}],
+    "speed": 0.0,
+    "cart_length": 20.0,
+    "cart_width": 4.0
+  }
+}

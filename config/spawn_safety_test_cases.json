@@ -1,0 +1,30 @@
+{
+  "epsilon": 0.000001,
+  "small_step": 0.01,
+  "seed": 12345,
+  "head_on_progress": 0.0,
+  "slow_speed": 10.0,
+  "catch_up_progress": 60.0,
+  "departing_tail_progress": 105.0,
+  "junction_blocker_progress": 40.0,
+  "buffer_cart_progress": 30.0,
+  "hold_time": 0.5,
+  "comparison_time": 8.0,
+  "rate_round_duration": 100.0,
+  "rate_early_time": 0.0,
+  "rate_late_time": 60.0,
+  "rate_window": 6.0,
+  "late_collision_distance": 300.0,
+  "vehicle": {
+    "nodes": {"L": [0, 0], "J": [100, 0], "R": [1000, 0], "B": [140, 40], "P": [0, 1000], "Q": [10000, 1000]},
+    "edges": [["L", "J"], ["J", "R"], ["J", "B"], ["P", "Q"]],
+    "switches": {"J": {"ports": ["L", "R", "B"], "initial": 0}},
+    "buffers": ["B", "P", "Q"],
+    "exits": ["L", "R"],
+    "starts": [{"from": "P", "to": "Q", "progress": 100}],
+    "speed": 0.0,
+    "cart_length": 20.0,
+    "cart_width": 4.0
+  },
+  "train": {"speed": 100.0, "cart_length": 20.0, "cart_width": 4.0}
+}

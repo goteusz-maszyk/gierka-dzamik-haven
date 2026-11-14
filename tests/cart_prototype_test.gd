@@ -54,10 +54,25 @@ func test_topology(sim) -> void:
 	var config: Dictionary = sim.config
 	check(config.tracks.size() == cases.track_y.size(), "Exactly six full-length tracks")
 	check(config.buffers.size() == int(cases.buffer_count), "Eight buffers")
-	check(config.exits.size() == int(cases.exit_count), "Eight open exits")
-	check(config.approach_tracks.size() == cases.approaches.size(), "Four approach tracks")
-	check(config.tracks.size() + config.approach_tracks.size() == int(cases.total_track_count), "Ten total tracks")
-	check(config.switches.size() == int(cases.switch_count), "Twenty-four switches")
+	check(config.exits.size() == int(cases.exit_count), "Six open exits")
+	check(config.approach_tracks.size() == cases.approaches.size(), "Two approach tracks")
+	check(config.tracks.size() + config.approach_tracks.size() == int(cases.total_track_count), "Eight total tracks")
+	check(config.switches.size() == int(cases.switch_count), "Twelve active switches")
+	check(config.merges.size() == int(cases.merge_count), "Ten passive merges")
+	check(sim.switches.size() == config.switches.size(), "Runtime state contains only active switches")
+	sim.restart(0)
+	for id in config.switches:
+		check(config.switches[id].initial == 0 or config.switches[id].initial == 1, "Binary initial switch setting: " + id)
+		check(int(config.switches[id].initial) == (1 if id in ["T3_102", "T4_52"] else 0), "Only requested main switches start diverted: " + id)
+		check(sim.switches[id] == int(config.switches[id].initial), "Initial restart matches config: " + id)
+	for id in cases.removed_nodes:
+		check(not config.nodes.has(id) and not config.switches.has(id) and not config.merges.has(id) and id not in config.exits, "Removed node absent from topology: " + id)
+		for edge in config.edges:
+			check(id not in edge, "No obsolete edge endpoint: " + id)
+		for switch in config.switches.values():
+			check(id not in switch.ports, "No obsolete switch port: " + id)
+		for merge in config.merges.values():
+			check(id not in merge.ports, "No obsolete merge port: " + id)
 	var covered := {}
 	var expected_buffers := []
 	var expected_exits := []
@@ -87,10 +102,10 @@ func test_topology(sim) -> void:
 				check(sim.point(id).x > sim.point(nodes[i - 1]).x, "Track nodes ordered left to right")
 				check(id in neighbors(config, nodes[i - 1]), "Continuous horizontal track edge")
 			if i > 0 and i < nodes.size() - 1:
-				sim.switches[id] = 0
+				if config.switches.has(id):
+					sim.switches[id] = 0
 				check(sim.route(id, nodes[i - 1]) == nodes[i + 1], "Straight route continues rightward")
 				check(sim.route(id, nodes[i + 1]) == nodes[i - 1], "Straight route continues leftward")
-				check(int(config.switches[id].initial) == 0, "All switches initially straight")
 	check(siding_count == int(cases.siding_count), "Four complete sidings")
 	for index in range(config.approach_tracks.size()):
 		var approach: Dictionary = config.approach_tracks[index]
@@ -120,10 +135,11 @@ func test_topology(sim) -> void:
 	for id in config.nodes:
 		var adjacent := neighbors(config, id)
 		if id in config.buffers or id in config.exits:
-			check(adjacent.size() == 1 and not config.switches.has(id), "Terminal has exactly one neighbor")
+			check(adjacent.size() == 1 and not config.switches.has(id) and not config.merges.has(id), "Terminal has exactly one neighbor and no routing metadata")
 		else:
-			check(adjacent.size() == 3 and config.switches.has(id), "Every junction is a three-port switch")
-			var ports: Array = config.switches[id].ports.duplicate()
+			check(adjacent.size() == 3 and config.switches.has(id) != config.merges.has(id), "Every junction has exactly one routing kind")
+			var metadata: Dictionary = config.switches[id] if config.switches.has(id) else config.merges[id]
+			var ports: Array = metadata.ports.duplicate()
 			ports.sort()
 			adjacent.sort()
 			check(ports == adjacent, "Ports cover exactly the incident edges")
@@ -148,7 +164,7 @@ func test_topology(sim) -> void:
 			clear = clear and Geometry2D.segment_intersects_segment(sim.point(edge[0]), sim.point(edge[1]), sim.point(other[0]), sim.point(other[1])) == null
 		check(unique, "No duplicate edge: " + str(edge))
 		check(clear, "Tracks intersect only at explicit junctions: " + str(edge))
-	# Traverse both crossovers of every neighboring pair in both directions.
+	# Each crossover can be selected only from its active end.
 	for index in range(config.tracks.size() - 1):
 		var upper: Array = config.tracks[index].nodes
 		var lower: Array = config.tracks[index + 1].nodes
@@ -165,16 +181,34 @@ func test_topology(sim) -> void:
 		for crossover in crossovers:
 			var offset: Vector2 = sim.point(crossover[1]) - sim.point(crossover[0])
 			check(not near(offset.x, 0.0) and offset.y > 0.0, "Crossover is diagonal between neighboring rows")
-			var direction := int(signf(sim.point(crossover[1]).x - sim.point(crossover[0]).x))
-			var path: Array = [upper[upper.find(crossover[0]) - direction], crossover[0], crossover[1], lower[lower.find(crossover[1]) + direction]]
-			follow_path(sim, path)
-			path.reverse()
+			var group := 0 if crossover in cases.crossover_groups[0] else 1
+			check(crossover == cases.crossover_groups[group][index], "Explicit crossover pair IDs")
+			check(near(sim.point(crossover[0]).x, cases.crossover_upper_x[group][index]) and near(sim.point(crossover[1]).x, cases.crossover_lower_x[group][index]), "Explicit staggered crossover coordinates")
+			check(offset.x > 0.0 if group == 0 else offset.x < 0.0, "Opposite backslash and slash groups")
+			var active: String = crossover[group]
+			var passive: String = crossover[1 - group]
+			check(config.switches.has(active) and config.merges.has(passive), "Each crossover has one active and one passive endpoint")
+			var active_ports: Array = config.switches[active].ports
+			var passive_ports: Array = config.merges[passive].ports
+			check(sim.point(active_ports[0]).x < sim.point(active).x and sim.point(passive_ports[0]).x > sim.point(passive).x, "Crossover active stem left, passive stem right")
+			var path: Array = [active_ports[0], active, passive, passive_ports[0]]
 			follow_path(sim, path)
 	for track in config.tracks:
 		var path: Array = track.nodes.duplicate()
 		follow_path(sim, path)
 		path.reverse()
 		follow_path(sim, path)
+	for segment in cases.merged_segments:
+		check(segment in config.edges or [segment[1], segment[0]] in config.edges, "Merged straight segment is one full edge")
+		for direction in [segment, [segment[1], segment[0]]]:
+			sim.restart(0)
+			place(sim, direction[0], direction[1], 0.0)
+			var heading: Vector2 = sim.heading()
+			var distance: float = sim.edge_length()
+			sim.advance((distance - cases.epsilon) / config.speed)
+			check(sim.from_node == direction[0] and sim.to_node == direction[1] and near(sim.progress, distance - cases.epsilon), "Full merged segment traversed without intermediate junction: " + str(direction))
+			sim.advance(cases.epsilon * 2.0 / config.speed)
+			check(sim.from_node == direction[1] and heading.dot(sim.heading()) > 0.0, "Merged segment reaches far switch without reversing: " + str(direction))
 	var circuit_rows := {}
 	for id in cases.buffer_circuit:
 		for index in range(config.tracks.size()):
@@ -207,6 +241,8 @@ func follow_path(sim, path: Array, start_index: int = -1, small = null) -> void:
 				check(sim.toggle(current), "Path switch is clear before entry: " + current)
 			if small != null and small.switches[current] != setting:
 				check(small.toggle(current), "Small-step path switch is clear before entry: " + current)
+		elif sim.config.merges.has(current):
+			check(cases.merge_routes[current][path[i - 1]] == next, "Fixed merge permits path at " + current)
 		var incoming: Vector2 = sim.heading()
 		var distance: float = sim.edge_length() - sim.progress
 		var duration: float = (distance + cases.epsilon) / sim.config.speed
@@ -223,15 +259,16 @@ func follow_path(sim, path: Array, start_index: int = -1, small = null) -> void:
 		else:
 			check(sim.to_node != path[i - 1] and incoming.dot(sim.heading()) > 0.0 and incoming.x * sim.heading().x > 0.0, "Switch traversal preserves forward direction: " + current)
 	var remaining: float = sim.edge_length() - sim.progress
+	var final_distance: float = remaining if sim.to_node in sim.config.exits else remaining - sim.config.cart_length / 2.0 - cases.epsilon
+	var final_duration: float = final_distance / sim.config.speed
+	sim.advance(final_duration)
 	if sim.to_node in sim.config.exits:
-		sim.advance(remaining / sim.config.speed)
 		check(sim.lost and sim.to_node == path[-1], "Path reaches chosen open exit: " + str(path[-1]))
 	else:
 		# Finish before the last node so a terminal buffer does not start a new leg.
-		sim.advance((remaining - sim.config.cart_length / 2.0) / sim.config.speed)
 		check(not sim.lost and sim.to_node == path[-1], "Path reaches final edge")
 	if small != null:
-		var duration: float = (remaining - sim.config.cart_length / 2.0) / sim.config.speed
+		var duration: float = final_duration
 		while duration > 0.0:
 			var step := minf(duration, cases.small_step)
 			small.advance(step)
@@ -241,13 +278,21 @@ func follow_path(sim, path: Array, start_index: int = -1, small = null) -> void:
 
 func test_cross_station(sim) -> void:
 	for approach in cases.approaches:
-		for target in sim.config.exits:
-			if target == approach.exit:
-				continue
+		var classified: Array = approach.reachable_exits + approach.unreachable_exits
+		var other_exits: Array = sim.config.exits.duplicate()
+		other_exits.erase(approach.exit)
+		classified.sort()
+		other_exits.sort()
+		check(classified == other_exits, "Reachability fixtures classify every other exit exactly once: " + approach.exit)
+		for target in approach.reachable_exits:
 			var path := find_path(sim, [approach.exit, approach.junction], target)
-			check(not path.is_empty(), "Every approach reaches every other exit: %s -> %s" % [approach.exit, target])
+			check(not path.is_empty(), "Approach reaches declared exit: %s -> %s" % [approach.exit, target])
 			if not path.is_empty():
-				follow_path(sim, path)
+				follow_path(sim, path, -1, Simulation.new())
+		for target in approach.unreachable_exits:
+			check(find_path(sim, [approach.exit, approach.junction], target).is_empty(), "One-sided crossovers prevent approach reaching left main exit: %s -> %s" % [approach.exit, target])
+	for path in cases.main_through_paths:
+		follow_path(sim, path, -1, Simulation.new())
 	for index in range(sim.config.starts.size()):
 		var start: Dictionary = sim.config.starts[index]
 		for track in sim.config.tracks:
@@ -257,7 +302,7 @@ func test_cross_station(sim) -> void:
 			var path := find_path(sim, [start.from, start.to], target)
 			check(not path.is_empty(), "Every start reaches every siding: %s -> %s" % [index, target])
 			if not path.is_empty():
-				follow_path(sim, path, index)
+				follow_path(sim, path, index, Simulation.new())
 
 
 func find_path(sim, source: Array, target: String) -> Array:
@@ -276,10 +321,11 @@ func find_path(sim, source: Array, target: String) -> Array:
 		visited[state] = true
 		if current in config.exits:
 			continue
-		for setting in [0, 1]:
+		for setting in ([0, 1] if config.switches.has(current) else [0]):
 			var next: String = previous
 			if current not in config.buffers:
-				sim.switches[current] = setting
+				if config.switches.has(current):
+					sim.switches[current] = setting
 				next = sim.route(current, previous)
 			pending.append(candidate + [next])
 	return []
@@ -322,8 +368,9 @@ func test_diagonal_step_equivalence(sim) -> void:
 			model.restart(0)
 			place(model, path[0], path[1], 0.0)
 			for i in range(1, path.size() - 1):
-				var options: Array = cases.routes[path[i]][path[i - 1]]
-				model.switches[path[i]] = options.find(path[i + 1])
+				if model.config.switches.has(path[i]):
+					var options: Array = cases.routes[path[i]][path[i - 1]]
+					model.switches[path[i]] = options.find(path[i + 1])
 		var duration: float = durations[index]
 		sim.advance(duration)
 		while duration > 0.0:
@@ -333,38 +380,48 @@ func test_diagonal_step_equivalence(sim) -> void:
 		check_same_simulations(sim, small, "Diagonal")
 		if index < durations.size() - 1:
 			check(sim.from_node == path[index + 1] and sim.to_node == path[index + 2], "Comparison actually crosses diagonal endpoint")
-			check(sim.is_locked(path[index + 1]), "Comparison retains rear lock at diagonal endpoint")
+			check(sim.is_locked(path[index + 1]) == sim.config.switches.has(path[index + 1]), "Only active diagonal endpoint retains rear lock")
+
+
+func test_default_main_diversions(sim) -> void:
+	var starts: Array = sim.config.starts.duplicate(true)
+	for route in [["T3_left", "T3_72", "T3_102", "T2_122", "T2_102"], ["T4_left", "T4_72", "T4_52", "T5_72", "T5_102"]]:
+		var vehicle = Simulation.new()
+		place(vehicle, route[0], route[1], 0.0)
+		var initial_switches: Dictionary = vehicle.switches.duplicate()
+		check(vehicle.switches[route[2]] == 1, "Production main diversion is initially selected: " + route[2])
+		var distance: float = vehicle.point(route[0]).distance_to(vehicle.point(route[2]))
+		vehicle.advance((distance + cases.epsilon) / vehicle.config.speed)
+		check(not vehicle.lost and vehicle.from_node == route[2] and vehicle.to_node == route[3], "Default main-left movement takes selected diversion: " + route[2])
+		var before: Vector2 = vehicle.cart_position()
+		vehicle.advance(cases.small_step)
+		var movement: Vector2 = vehicle.cart_position() - before
+		var diagonal: Vector2 = vehicle.point(route[3]) - vehicle.point(route[2])
+		check(movement.x > 0.0 and movement.y * diagonal.y > 0.0, "Default diversion physically moves toward inner siding: " + route[2])
+		vehicle.advance((vehicle.edge_length() - vehicle.progress + cases.epsilon) / vehicle.config.speed)
+		check(not vehicle.lost and vehicle.from_node == route[3] and vehicle.to_node == route[4], "Default main traffic enters inner siding: " + route[2])
+		check(vehicle.switches == initial_switches, "Default traffic never auto-toggles switches: " + route[2])
+		check(vehicle.config.starts == starts and sim.config.starts == starts, "Default traffic leaves curated cart starts unchanged")
+		for index in range(starts.size()):
+			sim.restart(index)
+			check(sim.from_node == starts[index].from and sim.to_node == starts[index].to and near(sim.progress, starts[index].progress), "Cart retains configured start alongside default traffic: " + str(index))
 
 
 func test_circuit_step_equivalence(sim) -> void:
 	var small = Simulation.new()
-	var path: Array = cases.buffer_circuit
-	var circuit_distance := 0.0
-	for i in range(1, path.size() - 1):
-		circuit_distance += sim.point(path[i - 1]).distance_to(sim.point(path[i]))
-	for duration in [(circuit_distance + cases.epsilon) / sim.config.speed, cases.large_delta]:
-		sim.restart(0)
-		place(sim, path[0], path[1], 0.0)
-		# This specific circuit also permits fixed settings for an uninterrupted advance.
-		for i in range(1, path.size() - 1):
-			if sim.config.switches.has(path[i]):
-				var options: Array = cases.routes[path[i]][path[i - 1]]
-				if options[sim.switches[path[i]]] != path[i + 1]:
-					sim.switches[path[i]] = options.find(path[i + 1])
-		for i in range(1, path.size() - 1):
-			if sim.config.switches.has(path[i]):
-				check(cases.routes[path[i]][path[i - 1]][sim.switches[path[i]]] == path[i + 1], "Fixed circuit settings permit every visit: " + str(path[i]))
-		small.restart(0)
-		small.switches = sim.switches.duplicate()
-		place(small, path[0], path[1], 0.0)
-		sim.advance(duration)
-		var remaining: float = duration
+	# T5_102 must be straight on descent and diverted on ascent.
+	follow_path(sim, cases.buffer_circuit, -1, small)
+	for start in range(sim.config.starts.size()):
+		sim.restart(start)
+		small.restart(start)
+		sim.advance(cases.large_delta)
+		var remaining: float = cases.large_delta
 		while remaining > 0.0:
 			var step := minf(remaining, cases.small_step)
 			small.advance(step)
 			remaining -= step
-		check(not sim.lost and not small.lost, "Six-row buffer circuit remains closed across large delta")
-		check_same_simulations(sim, small, "Whole six-row circuit")
+		check(not sim.lost and not small.lost, "Initial siding remains closed across large delta")
+		check_same_simulations(sim, small, "Large delta siding " + str(start))
 
 
 func run() -> void:
@@ -376,10 +433,12 @@ func run() -> void:
 	test_topology(sim)
 	test_cross_station(sim)
 	test_T1_52_diversion_preserves_eastbound_heading(sim)
+	test_default_main_diversions(sim)
 	for id in config.switches:
 		for neighbor in config.switches[id].ports:
 			check([id, neighbor] in config.edges or [neighbor, id] in config.edges, "Switch ports match graph edges")
 	check(cases.routes.size() == config.switches.size(), "Independent route fixtures cover every switch")
+	var active_routes := 0
 	for id in config.switches:
 		var ports: Array = config.switches[id].ports
 		var left := ""
@@ -401,6 +460,7 @@ func run() -> void:
 		for setting in [0, 1]:
 			sim.switches[id] = setting
 			for incoming in cases.routes[id]:
+				active_routes += 1
 				var expected: String = cases.routes[id][incoming][setting]
 				check(sim.route(id, incoming) == expected, "Route table: " + id)
 				place(sim, incoming, id, sim.point(incoming).distance_to(sim.point(id)) - half - cases.epsilon)
@@ -424,6 +484,29 @@ func run() -> void:
 				check(not sim.is_locked(id), "Rear releases: " + id)
 				check(sim.toggle(id), "Can switch after clearing: " + id)
 				sim.switches[id] = setting
+	check(active_routes == int(cases.active_route_count), "Exactly 72 active route cases")
+	check(cases.merge_routes.size() == config.merges.size(), "Independent fixed fixtures cover every merge")
+	var merge_routes := 0
+	for id in config.merges:
+		var ports: Array = config.merges[id].ports
+		check(config.merges[id].keys() == ["ports"], "Passive metadata has ports only: " + id)
+		check(cases.merge_routes[id].size() == ports.size(), "Three fixed entry fixtures: " + id)
+		check(sim.point(ports[0]).x > sim.point(id).x and sim.point(ports[1]).x < sim.point(id).x and sim.point(ports[2]).x < sim.point(id).x, "Passive stem right, straight and branch left: " + id)
+		for incoming in cases.merge_routes[id]:
+			merge_routes += 1
+			sim.restart(0)
+			var expected: String = cases.merge_routes[id][incoming]
+			check(sim.route(id, incoming) == expected, "Fixed route table: " + id)
+			place(sim, incoming, id, sim.point(incoming).distance_to(sim.point(id)) - half)
+			var before: Dictionary = sim.switches.duplicate()
+			check(not sim.is_locked(id) and not sim.toggle(id), "Passive front contact is neither locked nor selectable: " + id)
+			var incoming_heading: Vector2 = sim.heading()
+			sim.advance((half + cases.epsilon) / speed)
+			check(sim.from_node == id and sim.to_node == expected and sim.to_node != incoming, "Traverse fixed merge: " + id)
+			check(incoming_heading.dot(sim.heading()) > 0.0 and incoming_heading.x * sim.heading().x > 0.0, "Passive traversal preserves forward horizontal heading: " + id)
+			check(not sim.is_locked(id) and not sim.rear_locks.has(id) and not sim.toggle(id), "Passive rear contact never creates lock or accepts toggle: " + id)
+			check(sim.switches == before and not sim.switches.has(id), "Passive routing adds no selectable state: " + id)
+	check(merge_routes == int(cases.merge_route_count), "Exactly 30 fixed merge route cases")
 	# All eight buffers reflect, including the four not used by starts.
 	for buffer in config.buffers:
 		var neighbor: String = neighbors(config, buffer)[0]
@@ -436,8 +519,8 @@ func run() -> void:
 		check(near(incoming_heading.dot(sim.heading()), -1.0), "Buffer exactly reverses heading: " + buffer)
 		check(near(sim.progress, half), "Buffer carries leftover distance: " + buffer)
 		check(sim.rear_locks.is_empty(), "Buffer does not leave a stale rear lock: " + buffer)
-		check(sim.is_locked(neighbor) == (sim.edge_length() - sim.progress <= half), "Buffer return locks switch only on front contact: " + buffer)
-	# Starts cover exactly the four distinct sidings, with safe straight routing.
+		check(sim.is_locked(neighbor) == (config.switches.has(neighbor) and sim.edge_length() - sim.progress <= half), "Buffer return locks only active switch on front contact: " + buffer)
+	# Starts cover exactly the four distinct sidings with production initial routing.
 	var start_tracks := {}
 	for index in range(config.starts.size()):
 		sim.restart(index)
@@ -488,11 +571,17 @@ func run() -> void:
 		sim.restart()
 		seen[sim.start_index] = true
 	check(seen.size() == config.starts.size(), "Random restart covers all safe sidings")
+	if "--cart-only" in OS.get_cmdline_user_args():
+		print("Cart prototype (cart only): %d checks, %d failures" % [checks, failures])
+		quit(1 if failures else 0)
+		return
 	# Geometry keeps switches and UI targets disjoint in the actual 320x180 viewport.
 	for id in config.switches:
 		for other in config.switches:
 			if id != other:
 				check(sim.point(id).distance_to(sim.point(other)) > config.visual.click_radius * 2.0, "Disjoint switch hit areas")
+		for passive in config.merges:
+			check(sim.point(id).distance_to(sim.point(passive)) > config.visual.click_radius, "Passive nodes outside active click radius")
 	var visual: Dictionary = config.visual
 	var bounds: Array[Rect2] = []
 	for edge in config.edges:
@@ -532,12 +621,12 @@ func run() -> void:
 	await process_frame
 	check(game.simulation == game.traffic.cart, "Scene exposes the traffic cart as simulation")
 	check(game.traffic.elapsed > 0.0 and game.traffic.trains.is_empty() and game.traffic.warnings.is_empty(), "Automatic scene movement runs without train spawning")
-	check(game.status.text.contains("Elapsed: %.1fs" % game.traffic.elapsed) and game.status.text.contains("Trains: 0"), "Scene status shows elapsed time and train count")
+	check(game.status.text.contains("Left: %ds" % ceili(game.traffic.remaining_time())) and game.status.text.contains("Trains: 0"), "Scene status shows remaining time and train count")
 	check(not game.loss_overlay.visible and not game.restart_button.is_visible_in_tree() and not game.menu_button.is_visible_in_tree(), "Loss controls stay hidden during play")
 	var hud_controls: Array = game.status.get_parent().get_children()
 	hud_controls.append_array(game.get_node("CanvasLayer").get_children())
 	for control in hud_controls:
-		if control is Control and control != game.status.get_parent() and control != game.loss_overlay:
+		if control is Control and control != game.status.get_parent() and control != game.loss_overlay and control != game.win_overlay:
 			var ui_rect: Rect2 = control.get_global_rect()
 			if control is Label:
 				# Labels retain a taller pre-font minimum size; only their text is drawn.
@@ -547,6 +636,22 @@ func run() -> void:
 	var ui_switch: String = cases.ui_switch
 	var ui_incoming: String = cases.ui_incoming
 	var ui_exit: String = cases.ui_exit
+	var ui_exit_neighbor: String = neighbors(config, ui_exit)[0]
+	for id in cases.removed_nodes:
+		game.restart()
+		game.simulation.restart(0)
+		var before_click: Dictionary = game.simulation.switches.duplicate()
+		var position: Array = cases.removed_nodes[id]
+		click(Vector2(position[0], position[1]))
+		check(game.simulation.switches == before_click, "Obsolete node position is not clickable: " + id)
+		check(not game.traffic.toggle(id), "Obsolete node cannot be toggled: " + id)
+	for id in config.merges:
+		game.restart()
+		game.simulation.restart(0)
+		var before_click: Dictionary = game.simulation.switches.duplicate()
+		click(game.simulation.point(id))
+		check(game.simulation.switches == before_click, "Passive viewport click changes no switches: " + id)
+		check(not game.simulation.toggle(id) and not game.traffic.toggle(id), "Passive node rejects simulation and traffic toggles: " + id)
 	for id in config.switches:
 		game.restart()
 		game.simulation.restart(0)
@@ -562,7 +667,7 @@ func run() -> void:
 	var before: int = game.simulation.switches[ui_switch]
 	click(game.simulation.point(ui_switch))
 	check(game.simulation.switches[ui_switch] == before, "Mouse click respects overlap lock")
-	place(game.simulation, ui_switch, ui_exit, game.simulation.point(ui_switch).distance_to(game.simulation.point(ui_exit)) - half - cases.epsilon)
+	place(game.simulation, ui_exit_neighbor, ui_exit, game.simulation.point(ui_exit_neighbor).distance_to(game.simulation.point(ui_exit)) - half - cases.epsilon)
 	game.set_process(true)
 	await process_frame
 	await process_frame
@@ -584,7 +689,7 @@ func run() -> void:
 	for id in config.switches:
 		check(game.simulation.switches[id] == int(config.switches[id].initial), "Retry resets switch: " + id)
 	game.simulation.restart(0)
-	place(game.simulation, ui_switch, ui_exit, game.simulation.point(ui_switch).distance_to(game.simulation.point(ui_exit)) - half - cases.epsilon)
+	place(game.simulation, ui_exit_neighbor, ui_exit, game.simulation.point(ui_exit_neighbor).distance_to(game.simulation.point(ui_exit)) - half - cases.epsilon)
 	game.set_process(true)
 	await process_frame
 	await process_frame

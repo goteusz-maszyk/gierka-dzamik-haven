@@ -12,6 +12,11 @@ var ui_config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res
 @onready var menu_button: BaseButton = $CanvasLayer/GameUI/LossOverlay/Panel/Menu
 @onready var loss_overlay: Control = $CanvasLayer/GameUI/LossOverlay
 @onready var loss_reason: Label = $CanvasLayer/GameUI/LossOverlay/Panel/Reason
+@onready var win_overlay: Control = $CanvasLayer/GameUI/WinOverlay
+@onready var win_restart_button: BaseButton = $CanvasLayer/GameUI/WinOverlay/Panel/Retry
+@onready var win_menu_button: BaseButton = $CanvasLayer/GameUI/WinOverlay/Panel/Menu
+@onready var win_message: Label = $CanvasLayer/GameUI/WinOverlay/Panel/Reason
+@onready var win_message_format: String = win_message.text
 @onready var status_format: String = status.text
 @onready var loss_messages: Dictionary = {
 	"cart_exit": loss_reason.text,
@@ -27,9 +32,13 @@ func _ready() -> void:
 func restart() -> void:
 	traffic.restart()
 	simulation = traffic.cart
+	for button in [restart_button, menu_button, win_restart_button, win_menu_button]:
+		button.release_focus()
 	loss_overlay.hide()
+	win_overlay.hide()
 	_update_ui()
 	queue_redraw()
+
 
 func give_up() -> void:
 	get_tree().change_scene_to_file(MENU_PATH)
@@ -42,15 +51,23 @@ func _process(delta: float) -> void:
 
 
 func _update_ui() -> void:
-	status.text = status_format.format({"elapsed": "%.1f" % traffic.elapsed, "trains": traffic.trains.size()})
-	if traffic.lost and not loss_overlay.visible:
-		loss_reason.text = loss_messages[traffic.loss_reason]
-		loss_overlay.show()
-		restart_button.grab_focus()
+	status.text = status_format.format({"remaining": ceili(maxf(0.0, traffic.remaining_time())), "trains": traffic.trains.size()})
+	if traffic.lost:
+		win_overlay.hide()
+		if not loss_overlay.visible:
+			loss_reason.text = loss_messages[traffic.loss_reason]
+			loss_overlay.show()
+			restart_button.grab_focus()
+	elif traffic.won:
+		loss_overlay.hide()
+		if not win_overlay.visible:
+			win_message.text = win_message_format.format({"duration": str(traffic.config.round_duration)})
+			win_overlay.show()
+			win_restart_button.grab_focus()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if traffic.lost or loss_overlay.visible:
+	if traffic.lost or traffic.won or loss_overlay.visible or win_overlay.visible:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var local_click: Vector2 = get_global_transform_with_canvas().affine_inverse() * event.position

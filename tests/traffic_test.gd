@@ -35,11 +35,16 @@ func place(vehicle, source: String, target: String, progress: float) -> void:
 func fresh():
 	var sim = Traffic.new()
 	sim.config.spawning_enabled = false
+	sim.config.round_duration = cases.low_level_round_duration
+	sim.config.merge(cases.single_warning, true)
+	# These tests isolate footprint/scheduler mechanics; forecast safety has its own suite.
+	sim.config.safety_duration = 0.0
 	sim.cart.restart(0)
 	return sim
 
 
 func train_at(sim, source: String, target: String, progress: float):
+	check(neighbor_edge(sim, source, target), "Train fixture uses a real edge: " + source + " -> " + target)
 	var vehicle = Simulation.new(sim.cart.config.duplicate())
 	vehicle.config.merge(sim.config.train, true)
 	vehicle.switches = sim.cart.switches
@@ -47,6 +52,10 @@ func train_at(sim, source: String, target: String, progress: float):
 	place(vehicle, source, target, progress)
 	sim.trains.append(vehicle)
 	return vehicle
+
+
+func neighbor_edge(sim, source: String, target: String) -> bool:
+	return [source, target] in sim.cart.config.edges or [target, source] in sim.cart.config.edges
 
 
 func neighbor(sim, entry: String) -> String:
@@ -83,11 +92,19 @@ func test_entries_and_scheduler() -> void:
 	check(near(sim._until_warning, expected), "Next warning interval scales at successful spawn")
 	check(near(sim.cart.config.speed, original_speed), "Scheduler does not increase cart speed")
 	var seen := {}
+	var removed: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/cart_test_cases.json")).removed_nodes
+	var eligible := []
+	for entry in sim.cart.config.exits:
+		if sim._entry_safe(entry, sim.config.warning_duration):
+			eligible.append(entry)
+	for id in removed:
+		check(id not in eligible and id not in sim.cart.config.exits, "Removed node is not spawn eligible: " + id)
 	for draw in range(int(cases.random_draws)):
 		sim.restart()
 		sim.advance(first)
+		check(not removed.has(sim.warnings[0].entry), "Warning never selects a removed entry")
 		seen[sim.warnings[0].entry] = true
-	check(seen.size() == sim.cart.config.exits.size(), "Uniform entry selection reaches all eight exits")
+	check(seen.size() == sim.cart.config.exits.size(), "Uniform entry selection reaches all six exits")
 	for entry in sim.cart.config.exits:
 		sim = fresh()
 		park_cart(sim)
@@ -99,14 +116,15 @@ func test_entries_and_scheduler() -> void:
 			var train = sim.trains[0]
 			check(train.from_node == entry and train.to_node == neighbor(sim, entry), "Inward heading " + entry)
 			check(train.heading().dot(train.point(train.to_node) - train.point(entry)) > 0.0, "Train points inward " + entry)
-	# Beyond the scaling horizon, there is no win state and the interval clamps.
+	# An explicitly extended low-level round still clamps the scaling curve.
 	sim = fresh()
 	park_cart(sim)
 	sim.elapsed = sim.config.scaling_horizon + cases.long_time
+	sim._announcement_at = sim.elapsed + cases.disabled_delay
 	sim.config.spawning_enabled = true
 	sim.warnings = [{"entry": cases.busy_entry, "remaining": 0.0}]
 	sim.advance(cases.small_step)
-	check(not sim.lost and near(sim._until_warning + cases.small_step, sim.config.final_interval), "Horizon only clamps spawn frequency, never ends play")
+	check(not sim.lost and near(sim._until_warning + cases.small_step, sim.config.final_interval), "Extended round clamps spawn frequency")
 	check(near(sim.trains[0].config.speed, sim.config.train.speed), "Elapsed time does not increase train speed")
 
 
@@ -123,7 +141,7 @@ func test_busy_entry() -> void:
 	check(near(sim.warnings[0].remaining, 0.0), "Expired warning remains visible")
 	blocker.config.speed = sim.config.train.speed
 	var clear_distance: float = sim.config.train.cart_length - blocker.progress
-	sim.advance((clear_distance + sim.config.spawn_clearance * 2.0) / blocker.config.speed)
+	sim.advance((clear_distance + sim.config.spawn_clearance * 2.0) / blocker.config.speed + sim.config.retry_interval)
 	check(not sim.lost and sim.warnings.is_empty() and sim.trains.size() == 2, "Spawn occurs within a large frame once footprint clears")
 	# An outward train's rear still occupies the entry even after its center passes it.
 	sim = fresh()
@@ -146,6 +164,9 @@ func test_busy_entry() -> void:
 	blocker.progress = blocker.edge_length()
 	blocker.config.cart_width = cases.crossing_blocker_width
 	blocker.config.speed = 0.0
+	var candidate = sim._entry_train(entry)
+	check(blocker.from_node != entry and blocker.to_node != entry and absf(blocker.heading().dot(candidate.heading())) < 1.0, "Angled blocker occupies a different, non-collinear edge")
+	check(not sim._footprint_clear(candidate), "Retargeted angled spawn actually overlaps the wide blocker")
 	sim.config.spawning_enabled = true
 	sim.warnings = [{"entry": entry, "remaining": 0.0}]
 	sim.advance(cases.small_step)
@@ -160,12 +181,16 @@ func test_busy_entry() -> void:
 	sim.advance(cases.small_step)
 	check(not sim.lost and sim.trains.size() == 1 and sim.warnings.size() == 1, "Touching-only spawn footprint remains occupied")
 	blocker.progress += cases.rotation.gap
-	sim.advance(cases.rotation.gap / sim.config.train.speed / 2.0)
+	blocker.config.speed = sim.config.train.speed
+	sim.advance(sim.config.retry_interval)
 	check(not sim.lost and sim.trains.size() == 2 and sim.warnings.is_empty(), "Spawn succeeds once touching footprints separate")
 
 
 func test_routes_and_locks() -> void:
 	var sim = fresh()
+	var cart_cases: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/cart_test_cases.json"))
+	var active_count := 0
+	var passive_count := 0
 	for id in sim.cart.config.switches:
 		for setting in [0, 1]:
 			for incoming in routes[id]:
@@ -175,7 +200,20 @@ func test_routes_and_locks() -> void:
 				train.advance_distance(train.distance_to_event())
 				check(train.from_node == id and train.to_node == routes[id][incoming][setting], "Train shares route " + id)
 				check(before.dot(train.heading()) > 0.0 and before.x * train.heading().x > 0.0, "Train switch never reverses " + id)
+				active_count += 1
 				sim.trains.clear()
+	for id in sim.cart.config.merges:
+		for incoming in cart_cases.merge_routes[id]:
+			var train = train_at(sim, incoming, id, 0.0)
+			var before: Vector2 = train.heading()
+			train.advance_distance(train.distance_to_event())
+			check(train.from_node == id and train.to_node == cart_cases.merge_routes[id][incoming], "Train follows fixed passive route " + id)
+			check(before.dot(train.heading()) > 0.0 and before.x * train.heading().x > 0.0, "Passive train route never reverses " + id)
+			check(not sim.is_locked(id) and not sim.toggle(id) and not train.rear_locks.has(id), "Passive merge has no selectable route or rear lock " + id)
+			passive_count += 1
+			sim.trains.clear()
+	check(active_count == int(cart_cases.active_route_count), "All 72 active train combinations advanced")
+	check(passive_count == int(cart_cases.merge_route_count), "All 30 passive train entries advanced")
 	var lock: Dictionary = cases.lock
 	var a = train_at(sim, lock.id, lock.to, 0.0)
 	var b = train_at(sim, lock.id, lock.to, 0.0)
@@ -247,7 +285,14 @@ func collision_setup(kind: String):
 
 
 func compare(a, b, context: String) -> void:
-	check(a.lost == b.lost and a.loss_reason == b.loss_reason and near(a.elapsed, b.elapsed), context + " loss and event time")
+	check(a.lost == b.lost and a.won == b.won and a.loss_reason == b.loss_reason and near(a.elapsed, b.elapsed), context + " outcome and event time")
+	for field in ["_announcement_at", "_scheduler_at", "_warning_at", "_until_warning"]:
+		check(a.get(field) == b.get(field) or near(a.get(field), b.get(field)), context + " schedule " + field)
+	check(a.warnings.size() == b.warnings.size(), context + " pending warning count")
+	for i in range(mini(a.warnings.size(), b.warnings.size())):
+		check(a.warnings[i].entry == b.warnings[i].entry, context + " warning entry")
+		for field in ["remaining", "spawn_at", "check_at"]:
+			check(near(a.warnings[i][field], b.warnings[i][field]), context + " warning " + field)
 	check(a.trains.size() == b.trains.size(), context + " train count")
 	var av: Array = [a.cart] + a.trains
 	var bv: Array = [b.cart] + b.trains
@@ -257,11 +302,14 @@ func compare(a, b, context: String) -> void:
 			check(av[i].is_locked(id) == bv[i].is_locked(id), context + " vehicle lock " + id)
 
 
-func small_advance(sim, duration: float) -> void:
-	while duration > 0.0 and not sim.lost:
-		var step := minf(duration, cases.small_step)
-		sim.advance(step)
-		duration -= step
+func small_advance(sim, duration: float, step_size: float = -1.0) -> void:
+	var target: float = sim.elapsed + duration
+	while sim.elapsed < target and not sim.lost and not sim.won:
+		var before: float = sim.elapsed
+		sim.advance(minf(target - sim.elapsed, cases.small_step if step_size < 0.0 else step_size))
+		if sim.elapsed <= before and not sim.lost and not sim.won:
+			check(false, "Small-step simulation must advance or finish")
+			break
 
 
 func test_collisions_and_frame_independence() -> void:
@@ -289,7 +337,7 @@ func test_collisions_and_frame_independence() -> void:
 	var big = fresh()
 	var small = fresh()
 	for sim in [big, small]:
-		train_at(sim, "T5_72", "T5_left", cases.busy_progress)
+		train_at(sim, "T5_122", "T5_left", cases.busy_progress)
 	big.advance(cases.long_time)
 	small_advance(small, cases.long_time)
 	check(not big.lost, "Separate siding vehicles survive many buffer/node events")
@@ -314,7 +362,7 @@ func test_restart_and_invalid_delta() -> void:
 	sim.restart()
 	check(not sim.lost and sim.loss_reason.is_empty() and near(sim.elapsed, 0.0), "Restart resets loss and elapsed")
 	check(sim.trains.is_empty() and sim.warnings.is_empty() and sim.cart.rear_locks.is_empty(), "Restart clears trains, pending warning and locks")
-	check(near(sim._until_warning, sim.config.first_warning_delay), "Restart resets scheduler")
+	check(near(sim._until_warning, sim.config.first_warning_delay) and sim._scheduler_at == sim.config.first_warning_delay and sim._announcement_at == sim.config.first_warning_delay and sim._warning_at == INF, "Restart resets every scheduler clock")
 	for id in sim.cart.config.switches:
 		check(sim.cart.switches[id] == int(sim.cart.config.switches[id].initial), "Restart resets switch " + id)
 
@@ -337,7 +385,7 @@ func test_scheduler_frame_independence() -> void:
 		check(big.warnings.size() == small.warnings.size(), "Frame-independent pending warning count")
 		if not big.warnings.is_empty() and not small.warnings.is_empty():
 			check(big.warnings[0].entry == small.warnings[0].entry and near(big.warnings[0].remaining, small.warnings[0].remaining), "Frame-independent warning entry/countdown")
-		check(near(big._until_warning, small._until_warning), "Frame-independent successful-spawn schedule")
+		check(big._until_warning == small._until_warning or near(big._until_warning, small._until_warning), "Frame-independent successful-spawn schedule")
 		check(big.rng.state == small.rng.state, "Blocked retries consume no additional random entries")
 
 
@@ -354,6 +402,11 @@ func test_rotation_boundaries() -> void:
 			var blocker = train_at(sim, data.blocker_from, data.blocker_to, data.blocker_progress + gap)
 			blocker.config.speed = 0.0
 			duration = moving.distance_to_event() / moving.config.speed
+			var incoming = sim._copy_vehicle(moving, sim.cart.switches)
+			incoming.progress = incoming.edge_length()
+			check(sim._contact_interval(incoming, blocker, Vector2.ZERO, Vector2.ZERO, 0.0)[0] == INF, "Diagonal footprint is clear immediately before passive rotation")
+			incoming.advance_distance(0.0)
+			check((sim._contact_interval(incoming, blocker, Vector2.ZERO, Vector2.ZERO, 0.0)[0] == 0.0) == (gap == 0.0), "Actual passive rotation distinguishes tangency from near miss")
 		big.advance(duration)
 		small_advance(small, duration)
 		check(big.lost == (gap == 0.0), "Rotation-only tangency loses; angled near-miss survives")
@@ -367,13 +420,21 @@ func test_rotation_boundaries() -> void:
 		park_cart(sim)
 		sim.config.train.cart_length = cases.geometry_train_length
 		var moving = train_at(sim, data.from, data.node, 0.0)
+		moving.progress = moving.edge_length() - data.incoming_distance
 		sim.cart.switches[data.node] = 1
 		duration = moving.distance_to_event() / moving.config.speed
 		sim.config.spawning_enabled = true
 		sim.warnings = [{"entry": data.entry, "remaining": duration}]
+		var incoming = sim._copy_vehicle(moving, sim.cart.switches)
+		incoming.progress = incoming.edge_length()
+		check(sim._contact_interval(incoming, sim._entry_train(data.entry), Vector2.ZERO, Vector2.ZERO, 0.0)[0] == INF, "Incoming footprint at node is clear before rotation")
 	big.advance(duration)
-	small_advance(small, duration)
+	# Binary-exact substeps isolate simultaneous rotation/expiry from accumulated progress rounding.
+	small_advance(small, duration, data.small_step)
 	check(not big.lost and big.trains.size() == 1 and big.warnings.size() == 1, "Node rotation blocks simultaneous warning expiry before spawning")
+	check(near(big.elapsed, duration) and near(big.warnings[0].remaining, 0.0), "Warning expires exactly at the rotation event")
+	check(big.trains[0].from_node == data.node and big.trains[0].to_node == data.entry, "Fixture actually rotates onto the surviving approach")
+	check(not big._footprint_clear(big._entry_train(data.entry)), "Rotated footprint actually blocks the simultaneous spawn")
 	compare(big, small, "Warning/rotation simultaneous boundary")
 
 

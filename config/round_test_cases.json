@@ -1,0 +1,11 @@
+{
+  "epsilon": 0.000001,
+  "boundary_offset": 0.00000001,
+  "large_delta": 1000.0,
+  "small_step": 0.01,
+  "speed": 10.0,
+  "stationary_cart_progress": 1000.0,
+  "safe_progress": 100.0,
+  "deadline_entries": ["L", "R"],
+  "rotation": {"from": "T2_52", "node": "T3_72", "blocker_from": "T3_52", "blocker_to": "T3_122", "blocker_progress": 14.0, "length": 32.0}
+}
