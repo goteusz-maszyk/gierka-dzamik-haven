@@ -1,0 +1,8 @@
+{
+	"perfect_arrival_minutes": 540,
+	"deadline_buffer_minutes": 30,
+	"map_view_minutes_per_real_second": 0.6,
+	"station_view_minutes_per_real_second": 0.15,
+	"rewind_minutes_per_real_second": 12.0,
+	"rewind_meter_minutes": 180
+}

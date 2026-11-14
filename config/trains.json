@@ -1,0 +1,9 @@
+{
+	"dwell_minutes": 2,
+	"categories": {
+		"local": { "max_speed_kmh": 80, "accel_mps2": 0.7, "brake_mps2": 0.45, "number_prefix": "O", "number_start": 200 },
+		"regional": { "max_speed_kmh": 120, "accel_mps2": 0.5, "brake_mps2": 0.55, "number_prefix": "R", "number_start": 300 },
+		"express": { "max_speed_kmh": 160, "accel_mps2": 0.4, "brake_mps2": 0.65, "number_prefix": "E", "number_start": 100 },
+		"intercity": { "max_speed_kmh": 200, "accel_mps2": 0.3, "brake_mps2": 0.75, "number_prefix": "IC", "number_start": 100 }
+	}
+}

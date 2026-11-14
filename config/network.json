@@ -1,0 +1,96 @@
+{
+	"destination_station": "krakow",
+	"stations": [
+		{ "id": "warszawa", "name": "Warszawa", "map_pos": [580, 300], "start_city": true },
+		{ "id": "lodz", "name": "Łódź", "map_pos": [430, 360], "start_city": true },
+		{ "id": "poznan", "name": "Poznań", "map_pos": [220, 260], "start_city": true },
+		{ "id": "wroclaw", "name": "Wrocław", "map_pos": [240, 480], "start_city": true },
+		{ "id": "katowice", "name": "Katowice", "map_pos": [430, 590], "start_city": true },
+		{ "id": "krakow", "name": "Kraków", "map_pos": [520, 620], "start_city": false },
+		{ "id": "kielce", "name": "Kielce", "map_pos": [560, 500], "start_city": false },
+		{ "id": "radom", "name": "Radom", "map_pos": [590, 420], "start_city": false },
+		{ "id": "czestochowa", "name": "Częstochowa", "map_pos": [440, 510], "start_city": false },
+		{ "id": "opole", "name": "Opole", "map_pos": [330, 540], "start_city": false },
+		{ "id": "rzeszow", "name": "Rzeszów", "map_pos": [700, 600], "start_city": false }
+	],
+	"lines": [
+		{
+			"id": "L1",
+			"name": "Warszawa – Kraków",
+			"color": "#e63946",
+			"category": "intercity",
+			"frequency_minutes": 60,
+			"first_departure_minutes": 404,
+			"stops": [
+				{ "station": "warszawa", "km": 0 },
+				{ "station": "radom", "km": 100 },
+				{ "station": "kielce", "km": 180 },
+				{ "station": "krakow", "km": 320 }
+			]
+		},
+		{
+			"id": "L2",
+			"name": "Łódź – Kraków",
+			"color": "#457b9d",
+			"category": "regional",
+			"frequency_minutes": 60,
+			"first_departure_minutes": 381,
+			"stops": [
+				{ "station": "lodz", "km": 0 },
+				{ "station": "czestochowa", "km": 130 },
+				{ "station": "krakow", "km": 250 }
+			]
+		},
+		{
+			"id": "L3",
+			"name": "Poznań – Kraków",
+			"color": "#2a9d8f",
+			"category": "express",
+			"frequency_minutes": 120,
+			"first_departure_minutes": 241,
+			"stops": [
+				{ "station": "poznan", "km": 0 },
+				{ "station": "wroclaw", "km": 170 },
+				{ "station": "opole", "km": 270 },
+				{ "station": "katowice", "km": 360 },
+				{ "station": "krakow", "km": 440 }
+			]
+		},
+		{
+			"id": "L4",
+			"name": "Katowice – Kraków",
+			"color": "#e9c46a",
+			"category": "local",
+			"frequency_minutes": 30,
+			"first_departure_minutes": 450,
+			"stops": [
+				{ "station": "katowice", "km": 0 },
+				{ "station": "krakow", "km": 80 }
+			]
+		},
+		{
+			"id": "L5",
+			"name": "Warszawa – Łódź",
+			"color": "#9b5de5",
+			"category": "regional",
+			"frequency_minutes": 60,
+			"first_departure_minutes": 381,
+			"stops": [
+				{ "station": "warszawa", "km": 0 },
+				{ "station": "lodz", "km": 130 }
+			]
+		},
+		{
+			"id": "L6",
+			"name": "Kraków – Rzeszów",
+			"color": "#f4845f",
+			"category": "regional",
+			"frequency_minutes": 60,
+			"first_departure_minutes": 480,
+			"stops": [
+				{ "station": "krakow", "km": 0 },
+				{ "station": "rzeszow", "km": 160 }
+			]
+		}
+	]
+}

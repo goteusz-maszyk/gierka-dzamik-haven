@@ -24,7 +24,7 @@ your result worse.
 4. Player walks to a platform and boards a train.
 5. On boarding, the game switches to map view, with the player's train
    highlighted and the camera following it.
-6. While riding, the player marks the stop to get off at.
+6. While riding, the player watches for their stop.
 7. At that stop the player is in station view again, standing on the
    arrival platform, and walks to the next platform. Repeat until Kraków.
 8. The run ends the moment the player's train arrives in Kraków (no walking
@@ -55,7 +55,7 @@ your result worse.
 - Deadline and time remaining. After the deadline, time remaining does not
   go negative and does not change colour.
 - Rewind meter: a bar only (no numbers).
-- When riding: current train and your marked stop.
+- When riding: current train.
 
 ## Controls
 | Action                         | Key          |
@@ -140,11 +140,11 @@ your result worse.
 - Events only affect trains, never stations.
 - When an event happens:
   - an icon is shown on the affected train on the map (every affected
-    train, not only yours) for as long as the event is active;
+	train, not only yours) for as long as the event is active;
   - a short text popup is shown **only if it is your train**, and only in
-    map view (no popups in station view);
+	map view (no popups in station view);
   - departure boards and platform signs show the resulting delay, or
-    "Cancelled".
+	"Cancelled".
 
 | Event          | Effect                                                     |
 |----------------|------------------------------------------------------------|
@@ -170,12 +170,11 @@ your result worse.
 - Cost is 1:1: rewinding 10 in-game minutes uses 10 minutes of meter. The
   meter only drains while time is actually going backwards.
 - When the meter is empty you just keep going.
-- Cannot rewind past the start of the run (08:00). The meter does not drain
-  while blocked there.
+- Cannot rewind past the start of the run (the generated start time). The
+  meter does not drain while blocked there.
 - The player rewinds with the world. After releasing:
   - If you were on a train at that moment, you are back on that train, in
-    map view, and your "get off here" mark is restored to what it was at
-    that moment.
+	map view.
   - If you were in a station at that moment, you are put at that station's
     entrance, in station view. This is also true if you were mid-walk in a
     station you have since left.
@@ -208,7 +207,7 @@ your result worse.
   clock time: `state = f(timetable, events, time)`.
 - That makes rewind simple: just move the clock back. No world snapshots.
 - Only the player's own history needs to be recorded over time: which train
-  they were on (and their mark) or which station they were in. Rewind looks
+  they were on or which station they were in. Rewind looks
   up that history at the new time.
 - Fonts must render Polish characters (ą, ć, ę, ł, ń, ó, ś, ź, ż) for
   station names.

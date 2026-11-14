@@ -1,0 +1,21 @@
+{
+	"min_events": 15,
+	"max_events": 20,
+	"horizon_minutes": 480,
+	"types": {
+		"drunk_driver": {
+			"weight": 1,
+			"stop_duration_min_minutes": 30,
+			"stop_duration_max_minutes": 60
+		},
+		"slow_down": {
+			"weight": 1,
+			"speed_factor": 0.5
+		},
+		"cancel": {
+			"weight": 1,
+			"lead_minutes_min": 1,
+			"lead_minutes_max": 5
+		}
+	}
+}
