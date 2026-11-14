@@ -1,0 +1,91 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/hud.gd" id="1_hud"]
+[ext_resource type="PackedScene" path="res://scenes/ui/departure_board.tscn" id="2_board"]
+[ext_resource type="PackedScene" path="res://scenes/ui/center_panel.tscn" id="3_panel"]
+
+[node name="HUD" type="CanvasLayer"]
+layer = 2
+script = ExtResource("1_hud")
+
+[node name="TopLeft" type="VBoxContainer" parent="."]
+offset_left = 16.0
+offset_top = 16.0
+offset_right = 400.0
+offset_bottom = 100.0
+mouse_filter = 2
+
+[node name="Clock" type="Label" parent="TopLeft"]
+
+[node name="Deadline" type="Label" parent="TopLeft"]
+
+[node name="TimeLeft" type="Label" parent="TopLeft"]
+
+[node name="TopRight" type="VBoxContainer" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -216.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 70.0
+alignment = 2
+mouse_filter = 2
+
+[node name="ViewLabel" type="Label" parent="TopRight"]
+horizontal_alignment = 2
+
+[node name="SeedLabel" type="Label" parent="TopRight"]
+horizontal_alignment = 2
+
+[node name="BottomLeft" type="VBoxContainer" parent="."]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -60.0
+offset_right = 900.0
+offset_bottom = -16.0
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="TrainInfo" type="Label" parent="BottomLeft"]
+
+[node name="Hint" type="Label" parent="BottomLeft"]
+
+[node name="BottomRight" type="VBoxContainer" parent="."]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -236.0
+offset_top = -76.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="RewindCaption" type="Label" parent="BottomRight"]
+text = "Rewind (hold Space)"
+
+[node name="RewindBar" type="ProgressBar" parent="BottomRight"]
+show_percentage = false
+
+[node name="Message" type="Label" parent="."]
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -400.0
+offset_top = -96.0
+offset_right = 400.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 0
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="Board" parent="." instance=ExtResource("2_board")]
+
+[node name="PausePanel" parent="." instance=ExtResource("3_panel")]
+
+[node name="EndPanel" parent="." instance=ExtResource("3_panel")]

@@ -1,0 +1,44 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/departure_board.gd" id="1_board"]
+
+[node name="DepartureBoard" type="Panel"]
+visible = false
+script = ExtResource("1_board")
+
+[node name="Title" type="Label" parent="."]
+offset_left = 16.0
+offset_top = 26.0
+offset_right = 744.0
+offset_bottom = 52.0
+
+[node name="Headers" type="HBoxContainer" parent="."]
+offset_left = 16.0
+offset_top = 58.0
+offset_right = 744.0
+offset_bottom = 84.0
+
+[node name="Time" type="Label" parent="Headers"]
+custom_minimum_size = Vector2(104, 0)
+text = "Time"
+
+[node name="Train" type="Label" parent="Headers"]
+custom_minimum_size = Vector2(260, 0)
+text = "Train"
+
+[node name="Destination" type="Label" parent="Headers"]
+custom_minimum_size = Vector2(100, 0)
+text = "Destination"
+
+[node name="Platform" type="Label" parent="Headers"]
+custom_minimum_size = Vector2(80, 0)
+text = "Plat"
+
+[node name="Status" type="Label" parent="Headers"]
+text = "Status"
+
+[node name="Rows" type="VBoxContainer" parent="."]
+offset_left = 16.0
+offset_top = 68.0
+offset_right = 744.0
+offset_bottom = 404.0

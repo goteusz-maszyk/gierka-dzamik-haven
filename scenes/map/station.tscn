@@ -1,0 +1,22 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/map/station_view.gd" id="1_station"]
+
+[node name="Station" type="Node2D"]
+script = ExtResource("1_station")
+
+[node name="Marker" type="Polygon2D" parent="."]
+
+[node name="DestinationRing" type="Line2D" parent="."]
+visible = false
+closed = true
+
+[node name="NameLabel" type="Label" parent="."]
+visible = false
+offset_left = -120.0
+offset_top = -40.0
+offset_right = 120.0
+offset_bottom = -16.0
+horizontal_alignment = 1
+vertical_alignment = 2
+mouse_filter = 2

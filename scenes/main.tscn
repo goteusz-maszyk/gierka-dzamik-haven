@@ -1,20 +1,38 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/hud.gd" id="2_hud"]
-[ext_resource type="Script" path="res://scripts/hud_surface.gd" id="3_surface"]
+[ext_resource type="PackedScene" path="res://scenes/map/map.tscn" id="2_map"]
+[ext_resource type="Script" path="res://scripts/ui/rewind_overlay.gd" id="3_overlay"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="4_hud"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
 
-[node name="HUD" type="CanvasLayer" parent="."]
-script = ExtResource("2_hud")
+[node name="BackgroundLayer" type="CanvasLayer" parent="."]
+layer = -1
 
-[node name="Surface" type="Control" parent="HUD"]
+[node name="Background" type="ColorRect" parent="BackgroundLayer"]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-script = ExtResource("3_surface")
+color = Color(0, 0, 0, 1)
+
+[node name="Map" parent="." instance=ExtResource("2_map")]
+
+[node name="RewindLayer" type="CanvasLayer" parent="."]
+layer = 1
+
+[node name="Overlay" type="Control" parent="RewindLayer"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3_overlay")
+
+[node name="HUD" parent="." instance=ExtResource("4_hud")]

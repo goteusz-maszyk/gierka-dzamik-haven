@@ -2,61 +2,75 @@
 
 You are continuing a Godot 4.7 game called **Trains** (a Mini Metro-style Polish
 rail game: spawn in a random city, reach Kraków by a deadline, rewind time).
-Batch 1 (simulation core + a preview) is merged. Your job is **batch 2**.
+Batch 1 (simulation core) and batch 2 (node-based rendering refactor) are done.
+Your job is **batch 3: station view**. Work in SMALL slices: one focused change
+→ quick verify → PR → wait for human approval. Do not boil the ocean.
 
 ## Read first, in this order
-1. `docs/MASTER_PLAN.md` — the engineering plan, the public sim API, the batch
-   roadmap, and the rules. This is your source of truth for HOW to work.
-2. `DESIGN.md` — the game spec (what to build).
+1. `docs/MASTER_PLAN.md` — engineering plan, public sim API (§2), rules (§5),
+   run/verify commands (§7). Source of truth for HOW to work.
+2. `DESIGN.md` — game spec, especially "Station view (top-down WASD)",
+   "Controls", "Time", "Riding a train".
 3. `AGENTS.md` — repo rules (config-only tunables, no AI assets, no slop, blind
    reviews, keep it simple, ask if unclear).
 
-## The most important rule (do not skip)
-The batch-1 preview renders everything with immediate-mode `_draw()` calls in
-`scripts/main.gd` and `scripts/hud_surface.gd`. **That is the wrong architecture
-and your first task is to refactor it to retained-mode Godot nodes and `.tscn`
-scenes.** Tracks → `Line2D`; stations/trains → instanced scenes with `Sprite2D`
-placeholders + labels; HUD/board/end/pause → `Control` nodes (`Label`,
-`ProgressBar`, `Panel`, containers). Code creates/updates nodes and sets their
-properties; it does NOT paint game objects in `_draw()`. Every visual element
-must be visible/editable in the Godot editor and swappable by an artist without
-rewriting draw code. `_draw()` is allowed only for an isolated dynamic effect
-(e.g. the rewind VHS overlay), never for game objects. Full details and the
-acceptance criteria are in `docs/MASTER_PLAN.md` §0 and §4 (Batch 2).
+## Current architecture (batch 2 result — build on it, don't redo it)
+- `scenes/main.tscn` → `scripts/main.gd`: input + run lifecycle only.
+- `scenes/map/map.tscn` → `scripts/map/map_view.gd`: Line2D tracks
+  (`track.tscn`), instanced `station.tscn`/`train.tscn`, Camera2D follow/zoom.
+  All visuals are retained-mode nodes; the ONLY `_draw()` left is the isolated
+  rewind overlay (`scripts/ui/rewind_overlay.gd`).
+- `scenes/ui/hud.tscn` → `scripts/hud.gd`: Control HUD + instanced departure
+  board (`departure_board.tscn`, pooled `board_row.tscn`) + shared
+  `center_panel.tscn` (pause/end).
+- All visual tunables: `config/view.json`. Sim core (`run.gd`, `world.gd`,
+  `timetable.gd`, …) is tested and correct — views READ it, never rewrite it.
+- Placeholders are config-driven Polygon2D/Line2D nodes inside the scenes; the
+  artist swaps them without code changes.
+
+## Batch 3 scope (slice it into small PRs)
+Station view per DESIGN: top-down WASD walking on a path graph (paths +
+platforms only), entrance spawn, platform signs (next train), departure board
+at entrance (E), board by touching a dwelling train (no confirmation), trains
+visible arriving/waiting/leaving at platforms, Tab switches station↔map (clock
+rate already handled by `Run.advance`). Camera2D follows the player.
+
+**Open decision to resolve FIRST (ask the human, come with a concrete plan):**
+OSM data source/format for the walkable path graph per station. CUT ORDER #1:
+if OSM is too heavy for the jam, propose hand-authored simple path graphs per
+station in `config/` (still data-driven, still nodes) and get approval.
+
+Suggested slicing (each its own PR):
+1. Path-graph data format + one station's layout + player scene (placeholder
+   sprite, asset slot) + WASD movement along paths + camera follow.
+2. Platforms: signs (next train from `World.platform_next`), dwelling trains
+   visible at platforms, touch-to-board, disembark puts player on the arrival
+   platform. Replace the B/N stand-ins in `main.gd` with real walking.
+3. Entrance departure board trigger (E near the board), Tab view switching
+   wired to the station scene, rewind restores entrance position (history
+   already supports it).
 
 ## Do NOT
-- Do NOT rewrite the simulation core (`run.gd`, `world.gd`, `timetable.gd`,
-  `train_physics.gd`, `events.gd`, `route_planner.gd`, `player_history.gd`,
-  `config_data.gd`). It is correct and covered by 9,732 passing checks. Views
-  READ from it via the `World`/`Run` API documented in the master plan.
-- Do NOT hardcode tunables — everything goes in `config/*.json`.
-- Do NOT generate art or audio. Use labeled placeholder nodes; the artist
-  supplies real assets (asset list in the master plan §6).
-- Do NOT break the test suite or delete/narrow tests to make them pass.
+- Do NOT rewrite the sim core or the batch-2 node architecture.
+- Do NOT paint game objects in `_draw()` — nodes/scenes only (master plan §0).
+- Do NOT hardcode tunables — `config/*.json` only.
+- Do NOT generate art/audio. Labeled placeholder nodes; artist supplies assets
+  (master plan §6). Missing asset → say so.
+- Do NOT break/narrow the test suite.
 
-## Batch 2 scope
-1. **Refactor the preview to nodes/scenes** (mandatory first; see above). Keep
-   behavior identical: launch into a run, live map with moving trains, HUD
-   (clock/deadline/time-left/rewind bar/current train), departure board (E),
-   pause (Esc), rewind (hold Space), board (B) / disembark (N) as stand-ins for
-   station walking, restart (R), wheel zoom, camera follow.
-2. **Map view polish**: hover station names, Kraków highlight, player-train
-   highlight, event icons on affected trains (placeholder icon nodes with asset
-   slots), zoom min/max from config.
-
-## How to verify (required before calling it done)
+## How to verify (keep it quick — one pass, not a marathon)
 - `godot --headless --path . --import` then
-  `godot --headless --path . -s tests/run_all.gd` → exit 0, all checks pass.
-- Open `scenes/main.tscn` in the editor and confirm the node tree is real
-  (stations/trains/HUD as nodes, not one draw script). Capture an editor
-  screenshot AND a play screenshot as proof (Xvfb command in master plan §7).
-- Run blind reviewer subagents (code quality + bug hunt) given ONLY the code and
-  the relevant DESIGN.md sections — not your reasoning or this conversation.
-  Fix their findings, add regression tests, re-run the suite.
+  `godot --headless --path . -s tests/run_all.gd` → exit 0 (9,732+ checks).
+- One play screenshot of the changed surface (Xvfb command in master plan §7;
+  throwaway SceneTree script that injects input, saves
+  `get_viewport().get_texture().get_image()`, quits — delete it after).
+  NOTE: if the human's Godot editor is open on the project, headless editor
+  captures race with its session cache — prefer play-mode screenshots.
+- Blind reviewer subagents (code quality + bug hunt) given ONLY the code and
+  the relevant DESIGN.md sections. Fix findings before the PR.
 
 ## Deliverable
-Finish batch 2, test it, then open a PR (`gh pr create`, branch `batch-2-...`)
-with: what changed, verification (check counts + screenshots), any design
-decisions, and what batch 3 should do. Then STOP and wait for human approval —
-do not start batch 3. If anything is unclear or a decision is needed (e.g. OSM
-data source for batch 3), ask before proceeding, but come with a concrete plan.
+Per slice: branch `batch-3-<slug>` off the latest approved branch, commit,
+`gh pr create` with what changed / verification (check counts + screenshot) /
+decisions / what the next slice should do. Then STOP and wait for human
+approval. Update this prompt + `docs/MASTER_PLAN.md` status when a slice lands.

@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/map/map_view.gd" id="1_map"]
+
+[node name="Map" type="Node2D"]
+script = ExtResource("1_map")
+
+[node name="Tracks" type="Node2D" parent="."]
+
+[node name="Stations" type="Node2D" parent="."]
+
+[node name="Trains" type="Node2D" parent="."]
+
+[node name="Camera2D" type="Camera2D" parent="."]

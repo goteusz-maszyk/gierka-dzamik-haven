@@ -8,13 +8,10 @@ this file is the engineering plan + rules for AI agents working on it.
 
 ## 0. Prime directive: scenes, not `_draw()`
 
-**The current batch-1 preview is built wrong and must be refactored first.**
-`scripts/main.gd` and `scripts/hud_surface.gd` draw the entire game with
-immediate-mode `_draw()` calls (`draw_circle`, `draw_line`, `draw_string`).
-That was a throwaway to prove the sim renders. It is NOT the project's
-architecture. Problems: nothing is visible/editable in the Godot editor, the
-artist cannot plug assets into code-drawn primitives, and it does not scale to
-station view / sprites / UI themes.
+**Batch 2 completed this refactor** (the old batch-1 preview painted everything
+with immediate-mode `_draw()` calls; that throwaway is gone — `hud_surface.gd`
+deleted, map/HUD are now nodes/scenes). The rule below still governs all new
+rendering work: nothing may regress to `_draw()` for game objects.
 
 **Rule for all rendering work from here on:**
 - Build **retained-mode node trees and `.tscn` scenes**. Tracks are `Line2D`,
@@ -54,11 +51,12 @@ Pure headless sim implementing DESIGN's invariant
 | `scripts/player_history.gd` | Monotonic player log for rewind (`record_*`, `state_at`, `truncate_after`). |
 | `scripts/run.gd` | One run: clock, deadline fixed point, rewind meter, board/disembark, finish. |
 
-### Preview — EXISTS BUT MUST BE REFACTORED (see §0)
-`scenes/main.tscn`, `scripts/main.gd`, `scripts/hud.gd`, `scripts/hud_surface.gd`.
-Currently immediate-mode `_draw()`. Functionally it launches a run and shows
-map/HUD/board/rewind, but structurally it is the wrong pattern. Batch 2 task 1
-rebuilds it as nodes/scenes.
+### Preview — REFACTORED to nodes/scenes (batch 2, PR pending)
+`scenes/main.tscn` now instances `scenes/map/map.tscn` (Line2D tracks,
+instanced `station.tscn`/`train.tscn`, Camera2D) and `scenes/ui/hud.tscn`
+(Control HUD, departure board, pause/end panels). `scripts/hud_surface.gd`
+is deleted. The only remaining `_draw()` is the isolated rewind overlay
+(`scripts/ui/rewind_overlay.gd`), to be replaced by a VHS shader in batch 4.
 
 ### Config — all tunables live here (AGENTS.md rule)
 `config/network.json` (stations, lines, km, first departures), `trains.json`
@@ -135,32 +133,23 @@ and terminus. At the exact arrival instant the phase is "dwelling".
 
 ## 4. Batch roadmap
 
-### Batch 2 — node-based rendering refactor + map view (NEXT)
-**Task 1 (mandatory first): refactor the preview to retained-mode nodes/scenes.**
-- Delete the `_draw()`-based rendering in `main.gd`/`hud_surface.gd`.
-- Create scenes: `scenes/map/station.tscn`, `scenes/map/train.tscn`,
-  `scenes/map/track.tscn` (or Line2D built in code), `scenes/ui/hud.tscn`,
-  `scenes/ui/departure_board.tscn`, `scenes/ui/end_screen.tscn`,
-  `scenes/ui/pause_menu.tscn`.
-- Map view: a `Node2D` world container; tracks as `Line2D` per line (color from
-  config); stations as instanced `station.tscn` (Sprite2D placeholder + Label
-  shown on hover); trains as instanced `train.tscn` positioned each frame from
-  `world.train_state(...)` (interpolate `from→to` by `progress`). Camera2D
-  follows player train/station; zoom via Camera2D.zoom (config min/max).
-- HUD as Control nodes: clock Label, deadline Label, time-remaining Label,
-  rewind ProgressBar, current-train Label. Departure board a Panel +
-  VBoxContainer of row Controls. End/pause screens Control panels.
-- Keep `view.json` as the source of colors/sizes. Keep all sim logic in Run/World.
-- **Acceptance:** open `main.tscn` in the editor and SEE the node tree (stations,
-  trains, HUD as real nodes, not a single draw script). Play → identical behavior
-  to batch-1 preview. Suite still green. Add a couple of node-structure tests if
-  practical, but visual proof = editor screenshot + play screenshot.
+### Batch 2 — node-based rendering refactor + map view (DONE, PR pending)
+Delivered as one small slice (refactor only; the task-2 polish items already
+existed in the batch-1 draw code and carried over as nodes):
+- `scenes/map/map.tscn` + `scripts/map/map_view.gd`: Line2D tracks per line
+  (`track.tscn`), instanced `station.tscn`/`train.tscn`, Camera2D follow + zoom.
+- `scenes/ui/hud.tscn` + `scripts/hud.gd`: Control HUD (clock/deadline/time-left,
+  rewind ProgressBar, current train, message), instanced `departure_board.tscn`
+  (pooled `board_row.tscn` rows), shared `center_panel.tscn` for pause + end.
+- `scripts/ui/rewind_overlay.gd`: isolated `_draw()` tint/scanlines (batch 4
+  replaces with a VHS shader). `hud_surface.gd` deleted.
+- All visual tunables in `config/view.json`; placeholders are config-driven
+  Polygon2D/Line2D nodes the artist swaps inside the scenes.
+- Verified: suite 9,732 checks / 0 failures; play/board/pause/rewind screenshots
+  in `docs/screenshots/batch-2/`; clean runtime (no script errors/warnings from
+  the new code).
 
-**Task 2: map view polish** — hover station names, Kraków highlight, player-train
-highlight, event icons on affected trains (icon = placeholder node, asset slot
-for artist), zoom limits, camera follow. All from config.
-
-### Batch 3 — station view (top-down WASD)
+### Batch 3 — station view (top-down WASD) (NEXT)
 - OSM-based walkable path graph per station (DESIGN: paths + platforms only).
   Data source/format is an open decision — propose, document, get approval.
   CUT ORDER #1: if OSM is too heavy, use a hand-authored simple path graph per
