@@ -24,9 +24,12 @@ alignment = 1
 
 [node name="Label" type="Label" parent="CenterText" unique_id=528187503]
 layout_mode = 2
-text = "szalone vlaki czy cos"
+size_flags_horizontal = 3
+theme_type_variation = &"MenuTitle"
+text = "Patologiczne Koleje Polskie"
 horizontal_alignment = 1
 vertical_alignment = 1
+autowrap_mode = 2
 
 [node name="OptionsBtn" parent="." unique_id=1070156597 instance=ExtResource("2_hxu56")]
 layout_mode = 0
