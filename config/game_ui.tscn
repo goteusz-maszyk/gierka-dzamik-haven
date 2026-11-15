@@ -1,7 +1,6 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=2 format=3]
 
-[ext_resource type="Theme" path="res://config/game_ui.tres" id="1_theme"]
-[ext_resource type="PackedScene" path="res://scene/button.tscn" id="2_button"]
+[ext_resource type="Theme" path="res://config/board_theme.tres" id="1_theme"]
 
 [node name="GameUI" type="Control"]
 layout_mode = 3
@@ -13,32 +12,17 @@ grow_vertical = 2
 mouse_filter = 2
 theme = ExtResource("1_theme")
 
-[node name="HUDTitle" type="Label" parent="."]
-layout_mode = 0
-offset_left = 6.0
-offset_right = 314.0
-offset_bottom = 13.0
-mouse_filter = 2
-text = "prototype: trains / WIP junction layout"
-
 [node name="Status" type="Label" parent="."]
 layout_mode = 0
 offset_left = 6.0
-offset_top = 147.0
+offset_top = 160.0
 offset_right = 256.0
-offset_bottom = 160.0
+offset_bottom = 176.0
 mouse_filter = 2
-text = "Left: {remaining}s | Trains: {trains}"
-metadata/clearing = "Clear the station | Trains: {trains}"
-
-[node name="Help" type="Label" parent="."]
-layout_mode = 0
-offset_left = 6.0
-offset_top = 161.0
-offset_right = 256.0
-offset_bottom = 174.0
-mouse_filter = 2
-text = "Click circles. Orange = vehicle lock."
+theme_override_font_sizes/font_size = 9
+text = "Arrivals: {remaining}s   Trains: {trains}"
+vertical_alignment = 1
+metadata/clearing = "Clearing station   Trains: {trains}"
 
 [node name="LossOverlay" type="Control" parent="."]
 visible = false
@@ -79,37 +63,39 @@ layout_mode = 0
 offset_left = 8.0
 offset_top = 7.0
 offset_right = 216.0
-offset_bottom = 20.0
+offset_bottom = 24.0
 mouse_filter = 2
-text = "ROUND LOST"
+theme_override_font_sizes/font_size = 12
+text = "Shift ended"
 horizontal_alignment = 1
 
 [node name="Reason" type="Label" parent="LossOverlay/Panel"]
 layout_mode = 0
 offset_left = 8.0
-offset_top = 24.0
+offset_top = 27.0
 offset_right = 216.0
 offset_bottom = 56.0
 mouse_filter = 2
 text = "The cart left the station."
+theme_override_font_sizes/font_size = 9
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 metadata/cart_train = "The cart collided with a train."
 metadata/train_train = "Two trains collided."
 
-[node name="Retry" parent="LossOverlay/Panel" instance=ExtResource("2_button")]
+[node name="Retry" type="Button" parent="LossOverlay/Panel"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 62.0
+offset_top = 66.0
 offset_right = 96.0
 offset_bottom = 90.0
 text = "Retry"
 
-[node name="Menu" parent="LossOverlay/Panel" instance=ExtResource("2_button")]
+[node name="Menu" type="Button" parent="LossOverlay/Panel"]
 layout_mode = 0
 offset_left = 128.0
-offset_top = 62.0
+offset_top = 66.0
 offset_right = 184.0
 offset_bottom = 90.0
 text = "Menu"
@@ -153,35 +139,37 @@ layout_mode = 0
 offset_left = 8.0
 offset_top = 7.0
 offset_right = 216.0
-offset_bottom = 20.0
+offset_bottom = 24.0
 mouse_filter = 2
-text = "ROUND WON"
+theme_override_font_sizes/font_size = 12
+text = "Station clear!"
 horizontal_alignment = 1
 
 [node name="Reason" type="Label" parent="WinOverlay/Panel"]
 layout_mode = 0
 offset_left = 8.0
-offset_top = 24.0
+offset_top = 27.0
 offset_right = 216.0
 offset_bottom = 56.0
 mouse_filter = 2
-text = "Station cleared. All trains have left."
+text = "All trains are out. Your carriage is safe."
+theme_override_font_sizes/font_size = 9
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
 
-[node name="Retry" parent="WinOverlay/Panel" instance=ExtResource("2_button")]
+[node name="Retry" type="Button" parent="WinOverlay/Panel"]
 layout_mode = 0
 offset_left = 40.0
-offset_top = 62.0
+offset_top = 66.0
 offset_right = 96.0
 offset_bottom = 90.0
 text = "Retry"
 
-[node name="Menu" parent="WinOverlay/Panel" instance=ExtResource("2_button")]
+[node name="Menu" type="Button" parent="WinOverlay/Panel"]
 layout_mode = 0
 offset_left = 128.0
-offset_top = 62.0
+offset_top = 66.0
 offset_right = 184.0
 offset_bottom = 90.0
 text = "Menu"

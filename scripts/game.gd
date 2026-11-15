@@ -1,7 +1,8 @@
 extends Node2D
 
 const Traffic = preload("res://scripts/traffic_simulation.gd")
-const CART_TEXTURE = preload("res://ciufa.png")
+const CART_TEXTURE = preload("res://wagon.png")
+const TRAIN_TEXTURE = preload("res://pociag.png")
 const MENU_PATH = "res://scene/main_menu.tscn"
 
 var traffic = Traffic.new()
@@ -19,6 +20,7 @@ var ui_config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res
 @onready var win_message_format: String = win_message.text
 @onready var status_format: String = status.text
 @onready var clearing_status_format: String = status.get_meta("clearing")
+@onready var tutorial = $CanvasLayer/Tutorial
 @onready var loss_messages: Dictionary = {
 	"cart_exit": loss_reason.text,
 	"cart_train": loss_reason.get_meta("cart_train"),
@@ -32,6 +34,7 @@ func _ready() -> void:
 	traffic.train_spawned.connect(_on_train_spawned)
 	simulation.buffer_hit.connect($Sfx/Buffer.play)
 	MusicManager.stop_music()
+	tutorial.begin(self)
 	_update_ui()
 
 
@@ -45,6 +48,7 @@ func _stop_sfx() -> void:
 
 
 func restart() -> void:
+	tutorial.finish()
 	_stop_sfx()
 	traffic.restart()
 	simulation = traffic.cart
@@ -57,15 +61,21 @@ func restart() -> void:
 
 
 func give_up() -> void:
+	tutorial.finish()
 	_stop_sfx()
 	get_tree().change_scene_to_file(MENU_PATH)
 
 
 func _process(delta: float) -> void:
+	if tutorial.active:
+		tutorial.advance(delta)
+		queue_redraw()
+		return
 	var was_clearing: bool = traffic.is_clearing()
 	traffic.advance(delta)
 	if not was_clearing and traffic.is_clearing():
 		$Sfx/Warning.stop()
+		tutorial.finish()
 	_update_ui()
 	queue_redraw()
 
@@ -76,13 +86,17 @@ func _update_ui() -> void:
 	if traffic.lost:
 		win_overlay.hide()
 		if not loss_overlay.visible:
+			tutorial.finish()
 			_stop_sfx()
+			if traffic.loss_reason == "cart_train" or traffic.loss_reason == "train_train":
+				$Sfx/Collision.play()
 			loss_reason.text = loss_messages[traffic.loss_reason]
 			loss_overlay.show()
 			restart_button.grab_focus()
 	elif traffic.won:
 		loss_overlay.hide()
 		if not win_overlay.visible:
+			tutorial.finish()
 			_stop_sfx()
 			win_message.text = win_message_format.format({"duration": str(traffic.config.round_duration)})
 			win_overlay.show()
@@ -90,6 +104,9 @@ func _update_ui() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if tutorial.active:
+		tutorial.handle_board_input(event)
+		return
 	if traffic.lost or traffic.won or loss_overlay.visible or win_overlay.visible:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -100,6 +117,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				queue_redraw()
 				return
+
+
+func _draw_vehicle(vehicle, texture: Texture2D, tint: Color) -> void:
+	var vehicle_size := Vector2(vehicle.config.cart_length, vehicle.config.cart_width)
+	var heading: Vector2 = vehicle.heading()
+	var facing_left := heading.x < 0.0
+	var angle := (-heading).angle() if facing_left else heading.angle()
+	var sprite_scale := Vector2(-1, 1) if facing_left else Vector2.ONE
+	draw_set_transform(vehicle.cart_position(), angle, sprite_scale)
+	draw_texture_rect(texture, Rect2(-vehicle_size / 2.0, vehicle_size), false, tint)
 
 
 func _draw() -> void:
@@ -128,16 +155,9 @@ func _draw() -> void:
 		for neighbor in [ports[0], ports[1 + simulation.switches[id]]]:
 			var tip: Vector2 = center + (simulation.point(neighbor) - center).normalized() * v.route_arm
 			draw_line(center, tip, Color(v.route), v.route_width)
-	var cart_size := Vector2(config.cart_length, config.cart_width)
-	draw_set_transform(simulation.cart_position(), simulation.heading().angle())
-	draw_texture_rect(CART_TEXTURE, Rect2(-cart_size / 2.0, cart_size), false, Color(ui_config.cart_modulate))
+	_draw_vehicle(simulation, CART_TEXTURE, Color(ui_config.cart_modulate))
 	for train in traffic.trains:
-		var train_size := Vector2(train.config.cart_length, train.config.cart_width)
-		draw_set_transform(train.cart_position(), train.heading().angle())
-		draw_rect(Rect2(-train_size / 2.0, train_size), Color(ui_config.train_color))
-		var front_x: float = train_size.x / 2.0 - ui_config.train_front_width / 2.0
-		draw_line(Vector2(front_x, -train_size.y / 2.0), Vector2(front_x, train_size.y / 2.0),
-			Color(ui_config.train_front_color), ui_config.train_front_width)
+		_draw_vehicle(train, TRAIN_TEXTURE, Color(ui_config.train_modulate))
 	draw_set_transform(Vector2.ZERO)
 	for warning in traffic.warnings:
 		draw_circle(simulation.point(warning.entry), ui_config.warning_radius,

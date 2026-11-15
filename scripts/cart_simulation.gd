@@ -83,6 +83,8 @@ func distance_to_event() -> float:
 	var end_progress := edge_length()
 	if to_node in config.exits:
 		end_progress += config.cart_length / 2.0 * (1.0 if exits_safely else -1.0)
+	elif to_node in config.buffers:
+		end_progress -= config.cart_length / 2.0
 	return maxf(0.0, end_progress - progress)
 
 
@@ -114,6 +116,8 @@ func advance_distance(remaining: float) -> void:
 		from_node = arrived
 		progress = 0.0
 		if arrived in config.buffers:
+			# Reversing at front contact keeps the center half a length from the buffer.
+			progress = config.cart_length / 2.0
 			buffer_hit.emit()
 		if remaining <= 0.0:
 			break

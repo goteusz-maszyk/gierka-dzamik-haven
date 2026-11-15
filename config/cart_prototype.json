@@ -1,13 +1,13 @@
 {
   "topology_note": "WIP: provisional cascading junction layout, not a faithful final map",
   "speed": 22.0,
-  "cart_length": 10.0,
-  "cart_width": 4.0,
+  "cart_length": 20.0,
+  "cart_width": 8.0,
   "approach_angle_degrees": 30,
   "nodes": {
-	"T1_left": [20, 40], "T1_52": [40, 40], "T1_220": [220, 40], "T1_122": [292, 40], "T1_right": [300, 40],
-	"T2_left": [20, 58], "T2_72": [58, 58], "T2_52": [76, 58], "T2_122": [256, 58], "T2_102": [274, 58], "T2_right": [300, 58],
-	"T3_left": [20, 76], "T3_72": [94, 76], "T3_52": [112, 76], "T3_122": [226, 76], "T3_102": [238, 76], "T3_right": [300, 76],
+	"T1_left": [20, 40], "T1_52": [48, 40], "T1_220": [220, 40], "T1_122": [286, 40], "T1_right": [300, 40],
+	"T2_left": [20, 58], "T2_72": [66, 58], "T2_52": [80, 58], "T2_122": [256, 58], "T2_102": [268, 58], "T2_right": [300, 58],
+	"T3_left": [20, 76], "T3_72": [98, 76], "T3_52": [112, 76], "T3_122": [226, 76], "T3_102": [238, 76], "T3_right": [300, 76],
 	"T4_left": [20, 94], "T4_72": [130, 94], "T4_52": [148, 94], "T4_102": [208, 94], "T4_122": [196, 94], "T4_right": [300, 94],
 	"T5_left": [20, 112], "T5_122": [152, 112], "T5_72": [166, 112], "T5_102": [178, 112], "T5_52": [200, 112], "T5_right": [300, 112],
 	"T6_left": [20, 130], "T6_88": [88, 130], "T6_right_switch": [134, 130], "T6_left_switch": [218, 130], "T6_right": [300, 130],
@@ -70,10 +70,10 @@
 	"T6_left_switch": {"ports": ["T6_right", "T6_right_switch", "T5_52"]}
   },
   "starts": [
-	{"from": "T1_52", "to": "T1_left", "progress": 7},
-	{"from": "T2_72", "to": "T2_left", "progress": 7},
-	{"from": "T5_122", "to": "T5_left", "progress": 7},
-	{"from": "T6_88", "to": "T6_left", "progress": 7}
+	{"from": "T1_220", "to": "T1_52", "progress": 150},
+	{"from": "T2_122", "to": "T2_52", "progress": 100},
+	{"from": "T5_122", "to": "T5_left", "progress": 66},
+	{"from": "T6_left_switch", "to": "T6_right_switch", "progress": 40}
   ],
   "visual": {
 	"background": "17212b", "track": "6e8291", "route": "f7d66d",

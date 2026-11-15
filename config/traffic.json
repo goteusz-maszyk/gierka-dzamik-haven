@@ -21,5 +21,5 @@
   "first_warning_delay": 2.0,
   "spawning_enabled": true,
   "spawn_clearance": 0.001,
-  "train": {"speed": 26.0, "cart_length": 12.0, "cart_width": 4.0}
+  "train": {"speed": 26.0, "cart_length": 24.0, "cart_width": 8.0}
 }

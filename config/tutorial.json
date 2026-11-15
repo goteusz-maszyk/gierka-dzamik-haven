@@ -1,0 +1,9 @@
+{
+  "start_index": 0,
+  "switch_id": "T1_52",
+  "switch_setting": 1,
+  "highlight_buffers": ["T1_left", "T1_right"],
+  "highlight_color": "a6ffff",
+  "highlight_radius": 13.0,
+  "highlight_width": 1.0
+}
