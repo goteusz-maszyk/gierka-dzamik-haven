@@ -42,6 +42,7 @@ func _ready() -> void:
 	MusicManager.stop_music()
 	tutorial.begin(self)
 	_update_ui()
+	$CiuchCiuchTheme.play(0)
 
 
 func _on_train_spawned(train) -> void:
@@ -54,6 +55,8 @@ func _stop_sfx() -> void:
 
 
 func restart() -> void:
+	MusicManager.stop_music()
+	$CiuchCiuchTheme.play(0)
 	_reset_loss_presentation()
 	tutorial.finish()
 	_stop_sfx()
@@ -131,6 +134,8 @@ func _show_loss_panel() -> void:
 		return
 	loss_overlay.show()
 	_prepare_result_controls()
+	$CiuchCiuchTheme.stop()
+	MusicManager.play_music(preload("res://assets/tomek_i_przyjaciele.mp3"))
 
 
 func _prepare_result_controls() -> void:

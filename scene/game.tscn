@@ -1,17 +1,17 @@
 [gd_scene format=3 uid="uid://cc424g3w7uce4"]
 
 [ext_resource type="Script" uid="uid://dli4d5o7d5wih" path="res://scripts/game.gd" id="1"]
-[ext_resource type="Theme" path="res://config/board_theme.tres" id="2_board_theme"]
+[ext_resource type="Theme" uid="uid://bye7s6fq4qsda" path="res://config/board_theme.tres" id="2_board_theme"]
 [ext_resource type="PackedScene" path="res://config/game_ui.tscn" id="3_ui"]
 [ext_resource type="PackedScene" path="res://config/game_audio.tscn" id="4_audio"]
 [ext_resource type="PackedScene" path="res://config/tutorial.tscn" id="5_tutorial"]
+[ext_resource type="AudioStream" uid="uid://df10oypoqasjv" path="res://assets/ciuch_ciuch_theme.mp3" id="6_xlg7c"]
 
 [node name="Game" type="Node2D" unique_id=233003531]
 texture_filter = 1
 script = ExtResource("1")
 
-[node name="BoardCamera" type="Camera2D" parent="."]
-position_smoothing_enabled = false
+[node name="BoardCamera" type="Camera2D" parent="." unique_id=1190782268]
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1009868349]
 
@@ -24,11 +24,19 @@ theme = ExtResource("2_board_theme")
 theme_override_font_sizes/font_size = 9
 text = "Menu"
 
-[node name="GameUI" parent="CanvasLayer" instance=ExtResource("3_ui")]
+[node name="GameUI" parent="CanvasLayer" unique_id=1268956560 instance=ExtResource("3_ui")]
 
-[node name="Tutorial" parent="CanvasLayer" instance=ExtResource("5_tutorial")]
+[node name="Tutorial" parent="CanvasLayer" unique_id=955493379 instance=ExtResource("5_tutorial")]
 
-[node name="Sfx" parent="." instance=ExtResource("4_audio")]
+[node name="Pages" parent="CanvasLayer/Tutorial/Panel" index="1"]
+anchors_preset = 0
+
+[node name="Sfx" parent="." unique_id=1222724206 instance=ExtResource("4_audio")]
+
+[node name="CiuchCiuchTheme" type="AudioStreamPlayer" parent="." unique_id=1720798217]
+stream = ExtResource("6_xlg7c")
+bus = &"Music"
+parameters/looping = true
 
 [connection signal="button_down" from="CanvasLayer/GiveUpBtn" to="." method="give_up"]
 [connection signal="pressed" from="CanvasLayer/GameUI/LossOverlay/Panel/Retry" to="." method="restart"]
@@ -37,5 +45,5 @@ text = "Menu"
 [connection signal="pressed" from="CanvasLayer/GameUI/WinOverlay/Panel/Menu" to="." method="give_up"]
 
 [editable path="CanvasLayer/GameUI"]
-[editable path="Sfx"]
 [editable path="CanvasLayer/Tutorial"]
+[editable path="Sfx"]
