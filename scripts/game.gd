@@ -12,6 +12,8 @@ var loss_config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("r
 var _loss_started := false
 var _loss_tween: Tween
 var _result_menu_state: Dictionary = {}
+var _buffer_bounces: Dictionary = {}
+var _new_buffer_bounces: Array[int] = []
 @onready var board_camera: Camera2D = $BoardCamera
 @onready var status: Label = $CanvasLayer/GameUI/Status
 @onready var restart_button: BaseButton = $CanvasLayer/GameUI/LossOverlay/Panel/Retry
@@ -39,6 +41,7 @@ func _ready() -> void:
 	traffic.warning_created.connect($Sfx/Warning.play)
 	traffic.train_spawned.connect(_on_train_spawned)
 	simulation.buffer_hit.connect($Sfx/Buffer.play)
+	simulation.buffer_hit.connect(_on_buffer_hit.bind(simulation.get_instance_id()))
 	MusicManager.stop_music()
 	tutorial.begin(self)
 	_update_ui()
@@ -47,6 +50,32 @@ func _ready() -> void:
 
 func _on_train_spawned(train) -> void:
 	train.buffer_hit.connect($Sfx/Buffer.play)
+	train.buffer_hit.connect(_on_buffer_hit.bind(train.get_instance_id()))
+
+
+func _on_buffer_hit(vehicle_id: int) -> void:
+	_buffer_bounces[vehicle_id] = 0.0
+	_new_buffer_bounces.append(vehicle_id)
+
+
+func _advance_buffer_bounces(delta: float) -> void:
+	if _buffer_bounces.is_empty():
+		return
+	var step: float = delta if is_finite(delta) and delta > 0.0 else 0.0
+	var bounce: Dictionary = ui_config.buffer_bounce
+	var duration: float = bounce.compress_duration + bounce.rebound_duration + bounce.settle_duration
+	var active_ids: Array[int] = [simulation.get_instance_id()]
+	for train in traffic.trains:
+		active_ids.append(train.get_instance_id())
+	for vehicle_id in _buffer_bounces.keys():
+		var age: float = _buffer_bounces[vehicle_id]
+		# Impacts from this model update must show their first phase before aging.
+		if vehicle_id not in _new_buffer_bounces:
+			age += step
+		if vehicle_id not in active_ids or age >= duration:
+			_buffer_bounces.erase(vehicle_id)
+		else:
+			_buffer_bounces[vehicle_id] = age
 
 
 func _stop_sfx() -> void:
@@ -60,6 +89,8 @@ func restart() -> void:
 	_reset_loss_presentation()
 	tutorial.finish()
 	_stop_sfx()
+	_buffer_bounces.clear()
+	_new_buffer_bounces.clear()
 	traffic.restart()
 	simulation = traffic.cart
 	for button in [restart_button, menu_button, win_restart_button, win_menu_button]:
@@ -74,16 +105,22 @@ func give_up() -> void:
 	_reset_loss_presentation()
 	tutorial.finish()
 	_stop_sfx()
+	_buffer_bounces.clear()
+	_new_buffer_bounces.clear()
 	get_tree().change_scene_to_file(MENU_PATH)
 
 
 func _process(delta: float) -> void:
+	_new_buffer_bounces.clear()
 	if tutorial.active:
 		tutorial.advance(delta)
+		_advance_buffer_bounces(delta)
 		queue_redraw()
 		return
 	var was_clearing: bool = traffic.is_clearing()
+	var previous_time: float = traffic.elapsed
 	traffic.advance(delta)
+	_advance_buffer_bounces(traffic.elapsed - previous_time)
 	if not was_clearing and traffic.is_clearing():
 		$Sfx/Warning.stop()
 		tutorial.finish()
@@ -194,6 +231,19 @@ func _draw_vehicle(vehicle, texture: Texture2D, tint: Color) -> void:
 	var facing_left := heading.x < 0.0
 	var angle := (-heading).angle() if facing_left else heading.angle()
 	var sprite_scale := Vector2(-1, 1) if facing_left else Vector2.ONE
+	if _buffer_bounces.has(vehicle.get_instance_id()):
+		var age: float = _buffer_bounces[vehicle.get_instance_id()]
+		var bounce: Dictionary = ui_config.buffer_bounce
+		var compressed := Vector2(bounce.compressed_scale[0], bounce.compressed_scale[1])
+		var rebound := Vector2(bounce.rebound_scale[0], bounce.rebound_scale[1])
+		var deformation := Vector2.ONE
+		if age < bounce.compress_duration:
+			deformation = Vector2.ONE.lerp(compressed, smoothstep(0.0, 1.0, age / bounce.compress_duration))
+		elif age < bounce.compress_duration + bounce.rebound_duration:
+			deformation = compressed.lerp(rebound, smoothstep(0.0, 1.0, (age - bounce.compress_duration) / bounce.rebound_duration))
+		elif age < bounce.compress_duration + bounce.rebound_duration + bounce.settle_duration:
+			deformation = rebound.lerp(Vector2.ONE, smoothstep(0.0, 1.0, (age - bounce.compress_duration - bounce.rebound_duration) / bounce.settle_duration))
+		sprite_scale *= deformation
 	draw_set_transform(vehicle.cart_position(), angle, sprite_scale)
 	draw_texture_rect(texture, Rect2(-vehicle_size / 2.0, vehicle_size), false, tint)
 

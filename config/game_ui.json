@@ -3,5 +3,12 @@
   "warning_width": 1.5,
   "warning_color": "f7d66d",
   "cart_modulate": "ffffff",
-  "train_modulate": "ffffff"
+  "train_modulate": "ffffff",
+  "buffer_bounce": {
+    "compress_duration": 0.05,
+    "rebound_duration": 0.07,
+    "settle_duration": 0.12,
+    "compressed_scale": [0.7, 1.15],
+    "rebound_scale": [1.1, 0.95]
+  }
 }
