@@ -113,9 +113,6 @@ func _next_page() -> void:
 		"demo":
 			_demo_running = true
 			_show_page()
-		"play":
-			finish()
-			watch_warning = true
 		_:
 			step += 1
 			_show_page()
@@ -137,8 +134,8 @@ func handle_board_input(event: InputEvent) -> void:
 	if game.traffic.toggle(settings.switch_id):
 		game.queue_redraw()
 		if game.simulation.switches[settings.switch_id] == int(settings.switch_setting):
-			step += 1
-			_show_page()
+			finish()
+			watch_warning = true
 
 
 func _on_warning_created() -> void:
