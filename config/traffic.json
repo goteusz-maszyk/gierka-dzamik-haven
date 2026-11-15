@@ -1,13 +1,13 @@
 {
-  "initial_interval": 4.0,
-  "final_interval": 1.8,
+  "initial_interval": 3.2,
+  "final_interval": 1.44,
   "round_duration": 67.0,
   "scaling_horizon": 67.0,
-  "warning_duration": 1.8,
+  "warning_duration": 1.44,
   "initial_max_warnings": 1,
   "max_warnings": 2,
   "double_warning_after": 35.0,
-  "warning_stagger": 1.2,
+  "warning_stagger": 0.96,
   "pressure_weight": 2.0,
   "pressure_target_fraction": 0.5,
   "pressure_horizon": 10.0,
@@ -21,5 +21,5 @@
   "first_warning_delay": 2.0,
   "spawning_enabled": true,
   "spawn_clearance": 0.001,
-  "train": {"speed": 26.0, "cart_length": 24.0, "cart_width": 8.0}
+  "train": {"speed": 32.5, "cart_length": 24.0, "cart_width": 8.0}
 }
