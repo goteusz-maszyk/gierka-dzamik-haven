@@ -26,3 +26,6 @@ func _set_bus_volume(bus_name: String, linear_volume: float) -> void:
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		get_tree().change_scene_to_file("res://scene/main_menu.tscn")
+
+func _on_exit_btn() -> void:
+	get_tree().change_scene_to_file("res://scene/main_menu.tscn")

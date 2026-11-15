@@ -3,6 +3,7 @@
 [ext_resource type="Theme" uid="uid://v3j7p52oslm8" path="res://config/game_ui.tres" id="1_lcy60"]
 [ext_resource type="Texture2D" uid="uid://bsjwa3w73h6ft" path="res://assets/main menu.png" id="2_6kqe7"]
 [ext_resource type="Script" uid="uid://dghhgip08mdsb" path="res://scripts/options.gd" id="2_fvdw5"]
+[ext_resource type="PackedScene" uid="uid://b05o6ky4kg05v" path="res://scene/button.tscn" id="4_fvdw5"]
 
 [node name="Options" type="Control" unique_id=850809138]
 layout_mode = 3
@@ -79,5 +80,16 @@ custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 value = 100.0
 
+[node name="ExitBtn" parent="." unique_id=1723740496 instance=ExtResource("4_fvdw5")]
+layout_mode = 0
+offset_left = 5.0
+offset_top = 5.0
+offset_right = 64.0
+offset_bottom = 33.0
+hover_color = Color(1, 1.1, 1.1, 1)
+transition_duration = 0.15
+text = "Back to menu"
+
 [connection signal="value_changed" from="PanelContainer/OptionsContainer/VBoxContainer/MusicVolumeSlider" to="." method="_on_music_slider"]
 [connection signal="value_changed" from="PanelContainer/OptionsContainer/VBoxContainer2/SFXVolumeSlider" to="." method="_on_sfx_slider"]
+[connection signal="button_down" from="ExitBtn" to="." method="_on_exit_btn"]
