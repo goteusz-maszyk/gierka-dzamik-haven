@@ -32,34 +32,23 @@ autowrap_mode = 2
 
 [node name="OptionsBtn" parent="." unique_id=1070156597 instance=ExtResource("2_hxu56")]
 layout_mode = 0
-offset_left = 20.0
+offset_left = 244.0
 offset_top = 89.0
-offset_right = 20.0
-offset_bottom = 89.0
+offset_right = 300.0
+offset_bottom = 117.0
 hover_color = Color(1, 1.1, 1.1, 1)
 transition_duration = 0.15
 text = "Options"
 
 [node name="StartBtn" parent="." unique_id=64624246 instance=ExtResource("2_hxu56")]
 layout_mode = 0
-offset_left = 132.0
+offset_left = 20.0
 offset_top = 89.0
-offset_right = 132.0
-offset_bottom = 89.0
+offset_right = 76.0
+offset_bottom = 117.0
 hover_color = Color(1, 1.1, 1.1, 1)
 transition_duration = 0.15
 text = "Start"
 
-[node name="ExitBtn" parent="." unique_id=1805175452 instance=ExtResource("2_hxu56")]
-layout_mode = 0
-offset_left = 244.0
-offset_top = 89.0
-offset_right = 244.0
-offset_bottom = 89.0
-hover_color = Color(1, 1.1, 1.1, 1)
-transition_duration = 0.15
-text = "Exit"
-
 [connection signal="button_down" from="OptionsBtn" to="." method="_on_options_btn_click"]
 [connection signal="pressed" from="StartBtn" to="." method="_on_start_btn_click"]
-[connection signal="button_down" from="ExitBtn" to="." method="_on_exit_btn_click"]

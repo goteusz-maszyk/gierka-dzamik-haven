@@ -10,12 +10,12 @@ config_version=5
 
 [application]
 
-config/name="Gierka dzamik haven"
+config/name="Polskie Koleje Patologiczne"
 config/description="kocham 31lo i słowację"
 config/version="0.1"
 run/main_scene="uid://cgvgdnaa68ssl"
 config/features=PackedStringArray("4.7", "GL Compatibility")
-config/icon="res://icon.svg"
+config/icon="uid://olns3d75nvvv"
 
 [audio]
 
