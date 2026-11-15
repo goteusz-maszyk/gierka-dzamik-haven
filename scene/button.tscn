@@ -2,16 +2,18 @@
 
 [ext_resource type="Script" uid="uid://cmrxsyu3r8gm1" path="res://scripts/buttton.gd" id="1_b5a7g"]
 [ext_resource type="Texture2D" uid="uid://1esj56ndryt4" path="res://assets/button_ninepatch.png" id="2_auuqi"]
-[ext_resource type="Theme" path="res://config/game_ui.tres" id="3_theme"]
+[ext_resource type="Theme" uid="uid://v3j7p52oslm8" path="res://config/game_ui.tres" id="3_theme"]
 
 [node name="Button" type="TextureButton" unique_id=1723740496]
+custom_minimum_size = Vector2(56, 28)
 offset_right = 56.0
 offset_bottom = 28.0
 theme = ExtResource("3_theme")
 script = ExtResource("1_b5a7g")
+hover_color = null
+transition_duration = null
 
 [node name="Background" type="NinePatchRect" parent="." unique_id=322782978]
-mouse_filter = 2
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -26,16 +28,15 @@ patch_margin_right = 4
 patch_margin_bottom = 4
 
 [node name="BoxContainer" type="BoxContainer" parent="." unique_id=1761660193]
-mouse_filter = 2
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 alignment = 1
 
 [node name="Label" type="Label" parent="BoxContainer" unique_id=1197611898]
-mouse_filter = 2
 layout_mode = 2
 theme_override_font_sizes/font_size = 8

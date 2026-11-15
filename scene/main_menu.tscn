@@ -2,12 +2,14 @@
 
 [ext_resource type="Script" uid="uid://d05itsov12cyu" path="res://scripts/main_menu.gd" id="1_2fwvj"]
 [ext_resource type="Texture2D" uid="uid://bsjwa3w73h6ft" path="res://assets/main menu.png" id="1_hxu56"]
+[ext_resource type="Theme" uid="uid://v3j7p52oslm8" path="res://config/game_ui.tres" id="1_sepwh"]
 [ext_resource type="PackedScene" uid="uid://b05o6ky4kg05v" path="res://scene/button.tscn" id="2_hxu56"]
 [ext_resource type="AudioStream" uid="uid://jxu3ahna4c7c" path="res://assets/tomek_i_przyjaciele.mp3" id="4_0iwki"]
 
 [node name="MainMenu" type="Control" unique_id=2024463473]
 layout_mode = 3
 anchors_preset = 0
+theme = ExtResource("1_sepwh")
 script = ExtResource("1_2fwvj")
 
 [node name="background" type="Sprite2D" parent="." unique_id=1150299490]
@@ -32,6 +34,8 @@ offset_left = 20.0
 offset_top = 89.0
 offset_right = 20.0
 offset_bottom = 89.0
+hover_color = Color(1, 1.1, 1.1, 1)
+transition_duration = 0.15
 text = "Options"
 
 [node name="StartBtn" parent="." unique_id=64624246 instance=ExtResource("2_hxu56")]
@@ -40,6 +44,8 @@ offset_left = 132.0
 offset_top = 89.0
 offset_right = 132.0
 offset_bottom = 89.0
+hover_color = Color(1, 1.1, 1.1, 1)
+transition_duration = 0.15
 text = "Start"
 
 [node name="ExitBtn" parent="." unique_id=1805175452 instance=ExtResource("2_hxu56")]
@@ -48,11 +54,14 @@ offset_left = 244.0
 offset_top = 89.0
 offset_right = 244.0
 offset_bottom = 89.0
+hover_color = Color(1, 1.1, 1.1, 1)
+transition_duration = 0.15
 text = "Exit"
 
 [node name="TomekIPrzyjaciele" type="AudioStreamPlayer" parent="." unique_id=1757005088]
 stream = ExtResource("4_0iwki")
 autoplay = true
 
-[connection signal="button_down" from="ExitBtn" to="." method="_on_exit_btn_click"]
+[connection signal="button_down" from="OptionsBtn" to="." method="_on_options_btn_click"]
 [connection signal="pressed" from="StartBtn" to="." method="_on_start_btn_click"]
+[connection signal="button_down" from="ExitBtn" to="." method="_on_exit_btn_click"]

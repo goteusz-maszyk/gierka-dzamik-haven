@@ -1,0 +1,87 @@
+[gd_scene format=3 uid="uid://bpe7wt6tympse"]
+
+[ext_resource type="Theme" uid="uid://v3j7p52oslm8" path="res://config/game_ui.tres" id="1_lcy60"]
+[ext_resource type="Texture2D" uid="uid://bsjwa3w73h6ft" path="res://assets/main menu.png" id="2_6kqe7"]
+[ext_resource type="Script" uid="uid://dghhgip08mdsb" path="res://scripts/options.gd" id="2_fvdw5"]
+
+[node name="Options" type="Control" unique_id=850809138]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_lcy60")
+script = ExtResource("2_fvdw5")
+
+[node name="background" type="Sprite2D" parent="." unique_id=1994232335]
+position = Vector2(160, 90)
+texture = ExtResource("2_6kqe7")
+
+[node name="CenterText" type="HBoxContainer" parent="." unique_id=2007297839]
+layout_mode = 0
+offset_right = 320.0
+offset_bottom = 24.0
+alignment = 1
+
+[node name="Label" type="Label" parent="CenterText" unique_id=2023236237]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Options"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="PanelContainer" type="PanelContainer" parent="." unique_id=1215370391]
+layout_mode = 0
+offset_left = 53.0
+offset_top = 83.0
+offset_right = 267.0
+offset_bottom = 123.0
+theme = ExtResource("1_lcy60")
+
+[node name="OptionsContainer" type="VBoxContainer" parent="PanelContainer" unique_id=179059285]
+layout_mode = 2
+alignment = 1
+
+[node name="VBoxContainer" type="HBoxContainer" parent="PanelContainer/OptionsContainer" unique_id=727563805]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 2
+
+[node name="MusicVolumeLabel" type="Label" parent="PanelContainer/OptionsContainer/VBoxContainer" unique_id=594710833]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Music Volume"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MusicVolumeSlider" type="HSlider" parent="PanelContainer/OptionsContainer/VBoxContainer" unique_id=1804427340]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+min_value = 0.0
+max_value = 2.0
+step = 0.05
+value = 1.0
+
+[node name="VBoxContainer2" type="HBoxContainer" parent="PanelContainer/OptionsContainer" unique_id=1836158706]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 2
+
+[node name="MusicVolumeLabel" type="Label" parent="PanelContainer/OptionsContainer/VBoxContainer2" unique_id=1085454413]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "SFX Volume"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SFXVolumeSlider" type="HSlider" parent="PanelContainer/OptionsContainer/VBoxContainer2" unique_id=1465646359]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+min_value = 0.0
+max_value = 100.0
+step = 1.0
+value = 100.0
+
+[connection signal="value_changed" from="PanelContainer/OptionsContainer/VBoxContainer/MusicVolumeSlider" to="." method="_on_music_slider"]
+[connection signal="value_changed" from="PanelContainer/OptionsContainer/VBoxContainer2/SFXVolumeSlider" to="." method="_on_sfx_slider"]

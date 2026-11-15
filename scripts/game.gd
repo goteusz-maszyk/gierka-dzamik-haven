@@ -31,6 +31,7 @@ func _ready() -> void:
 	traffic.warning_created.connect($Sfx/Warning.play)
 	traffic.train_spawned.connect(_on_train_spawned)
 	simulation.buffer_hit.connect($Sfx/Buffer.play)
+	MusicManager.stop_music()
 	_update_ui()
 
 
