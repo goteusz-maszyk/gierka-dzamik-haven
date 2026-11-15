@@ -54,6 +54,10 @@ func remaining_time() -> float:
 	return maxf(0.0, config.round_duration - elapsed)
 
 
+func is_clearing() -> bool:
+	return elapsed >= config.round_duration
+
+
 func toggle(id: String) -> bool:
 	if lost or won or not cart.switches.has(id) or is_locked(id):
 		return false
@@ -144,6 +148,8 @@ func _forecast():
 
 
 func _entry_safe(entry: String, lead: float, defer_conflicting: bool = false) -> bool:
+	if elapsed + lead >= config.round_duration:
+		return false
 	var forecast = _forecast()
 	var plans: Array = [{"entry": entry, "at": elapsed + lead, "candidate": true}]
 	var latest := elapsed + lead
@@ -151,11 +157,13 @@ func _entry_safe(entry: String, lead: float, defer_conflicting: bool = false) ->
 		if warning.entry == entry:
 			continue
 		var at: float = maxf(elapsed, warning.get("check_at", elapsed + warning.remaining))
+		if at >= config.round_duration:
+			continue
 		plans.append({"entry": warning.entry, "at": at, "candidate": false})
 		latest = maxf(latest, at)
 	plans.sort_custom(func(a, b): return a.at < b.at or (a.at == b.at and a.candidate and not b.candidate))
 	for plan in plans:
-		forecast._advance_to(minf(config.round_duration, plan.at), false)
+		forecast._advance_to(plan.at, false)
 		if forecast.lost:
 			return false
 		if forecast.won:
@@ -167,13 +175,13 @@ func _entry_safe(entry: String, lead: float, defer_conflicting: bool = false) ->
 				# Its later retry will see the admitted train as actual traffic.
 				var joint = forecast._forecast()
 				joint.trains.append(joint._entry_train(plan.entry))
-				joint._advance_to(minf(config.round_duration, latest + config.safety_duration), false)
+				joint._advance_to(latest + config.safety_duration, false)
 				if joint.lost:
 					continue
 			forecast.trains.append(candidate)
 		elif plan.candidate:
 			return false
-	forecast._advance_to(minf(config.round_duration, latest + config.safety_duration), false)
+	forecast._advance_to(latest + config.safety_duration, false)
 	return not forecast.lost
 
 
@@ -206,6 +214,13 @@ func _warning_limit() -> int:
 
 
 func _sync_schedule() -> void:
+	if lost or won or is_clearing():
+		warnings.clear()
+		_announcement_at = INF
+		_warning_at = INF
+		_scheduler_at = INF
+		_until_warning = INF
+		return
 	_warning_at = INF
 	_scheduler_at = _announcement_at if warnings.size() < _warning_limit() else INF
 	if not lost and not won and elapsed < config.double_warning_after:
@@ -218,7 +233,8 @@ func _sync_schedule() -> void:
 
 
 func _schedule() -> void:
-	if lost or won:
+	if lost or won or is_clearing():
+		_sync_schedule()
 		return
 	for warning in warnings:
 		if not warning.has("spawn_at"):
@@ -271,23 +287,24 @@ func _schedule() -> void:
 func advance(delta: float) -> void:
 	if lost or won or delta <= 0.0 or not is_finite(delta):
 		return
-	_advance_to(minf(config.round_duration, elapsed + delta), config.spawning_enabled)
+	_advance_to(elapsed + delta, config.spawning_enabled)
 
 
 func _advance_to(deadline: float, spawning: bool) -> void:
 	while not lost and not won:
-		if elapsed >= config.round_duration:
-			won = true
-			warnings.clear()
-			_announcement_at = INF
+		if is_clearing():
 			_sync_schedule()
-			break
-		if spawning:
+			if trains.is_empty():
+				won = true
+				break
+		elif spawning:
 			_schedule()
 		if elapsed >= deadline:
 			break
 		var vehicles: Array = [cart] + trains
 		var event_at := deadline
+		if not is_clearing():
+			event_at = minf(event_at, config.round_duration)
 		for vehicle in vehicles:
 			if vehicle.config.speed > 0.0:
 				event_at = minf(event_at, elapsed + vehicle.distance_to_event() / vehicle.config.speed)
@@ -326,6 +343,4 @@ func _advance_to(deadline: float, spawning: bool) -> void:
 						lost = true
 						loss_reason = "cart_train" if i == 0 else "train_train"
 	if lost:
-		warnings.clear()
-		_announcement_at = INF
 		_sync_schedule()

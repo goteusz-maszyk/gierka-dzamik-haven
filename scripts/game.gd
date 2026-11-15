@@ -18,6 +18,7 @@ var ui_config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res
 @onready var win_message: Label = $CanvasLayer/GameUI/WinOverlay/Panel/Reason
 @onready var win_message_format: String = win_message.text
 @onready var status_format: String = status.text
+@onready var clearing_status_format: String = status.get_meta("clearing")
 @onready var loss_messages: Dictionary = {
 	"cart_exit": loss_reason.text,
 	"cart_train": loss_reason.get_meta("cart_train"),
@@ -51,7 +52,8 @@ func _process(delta: float) -> void:
 
 
 func _update_ui() -> void:
-	status.text = status_format.format({"remaining": ceili(maxf(0.0, traffic.remaining_time())), "trains": traffic.trains.size()})
+	var text_format: String = clearing_status_format if traffic.is_clearing() else status_format
+	status.text = text_format.format({"remaining": ceili(maxf(0.0, traffic.remaining_time())), "trains": traffic.trains.size()})
 	if traffic.lost:
 		win_overlay.hide()
 		if not loss_overlay.visible:

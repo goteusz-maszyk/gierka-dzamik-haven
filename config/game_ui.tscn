@@ -29,6 +29,7 @@ offset_right = 256.0
 offset_bottom = 160.0
 mouse_filter = 2
 text = "Left: {remaining}s | Trains: {trains}"
+metadata/clearing = "Clear the station | Trains: {trains}"
 
 [node name="Help" type="Label" parent="."]
 layout_mode = 0
@@ -164,7 +165,7 @@ offset_top = 24.0
 offset_right = 216.0
 offset_bottom = 56.0
 mouse_filter = 2
-text = "You survived {duration} seconds."
+text = "Station cleared. All trains have left."
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 2
