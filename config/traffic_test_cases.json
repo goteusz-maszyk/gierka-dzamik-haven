@@ -8,6 +8,16 @@
   "disabled_delay": 100000.0,
   "seed": 12345,
   "random_draws": 256,
+  "speed_vehicle": {
+    "nodes": {"L": [0, 0], "R": [300, 0], "C": [0, 100], "J": [150, 100], "D": [300, 100], "B": [150, 200]},
+    "edges": [["L", "R"], ["C", "J"], ["J", "D"], ["J", "B"]],
+    "tracks": [],
+    "buffers": ["C", "D", "B"],
+    "exits": ["L", "R"],
+    "switches": {"J": {"ports": ["C", "D", "B"], "initial": 0}},
+    "merges": {},
+    "starts": [{"from": "C", "to": "J", "progress": 20.0}]
+  },
   "head_on": {"from": "T3_left", "to": "T3_72", "cart_progress": 10.0, "train_progress": 10.0},
   "catch_up": {"from": "T2_52", "to": "T2_122", "leader_progress": 70.0, "follower_progress": 20.0, "leader_speed": 10.0, "follower_speed": 40.0},
   "junction": {"id": "T3_72", "a": "T3_left", "b": "T2_52", "distance": 25.0},

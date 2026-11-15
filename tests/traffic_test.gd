@@ -81,10 +81,11 @@ func test_entries_and_scheduler() -> void:
 	sim.advance(cases.epsilon)
 	check(sim.warnings.size() == 1 and sim.trains.is_empty(), "First warning at configured delay")
 	check(near(sim.warnings[0].remaining, sim.config.warning_duration), "Warning starts with full duration")
+	var announced_speed: float = sim.warnings[0].speed
 	sim.advance(sim.config.warning_duration)
 	check(sim.warnings.is_empty() and sim.trains.size() == 1, "Spawn exactly on warning expiration")
 	var original_speed: float = sim.cart.config.speed
-	check(near(sim.trains[0].config.speed, sim.config.train.speed), "Independent train speed")
+	check(near(sim.trains[0].config.speed, announced_speed), "Spawn preserves announced train speed")
 	check(near(sim.cart.config.cart_length, Simulation.new().config.cart_length), "Train dimensions do not mutate cart")
 	check(is_same(sim.cart.switches, sim.trains[0].switches), "Actual shared switch reference")
 	check(is_same(sim.cart.config.nodes, sim.trains[0].config.nodes) and is_same(sim.cart.config.edges, sim.trains[0].config.edges), "Topology shared without deep copies")
@@ -125,7 +126,48 @@ func test_entries_and_scheduler() -> void:
 	sim.warnings = [{"entry": cases.busy_entry, "remaining": 0.0}]
 	sim.advance(cases.small_step)
 	check(not sim.lost and near(sim._until_warning + cases.small_step, sim.config.final_interval), "Extended round clamps spawn frequency")
-	check(near(sim.trains[0].config.speed, sim.config.train.speed), "Elapsed time does not increase train speed")
+	check(near(sim.trains[0].config.speed, sim.config.train.speed), "Explicit base-speed fixture does not accelerate after spawn")
+
+
+func test_speed_progression() -> void:
+	var settings = Traffic.new().config
+	for at in [0.0, settings.scaling_horizon / 2.0, settings.scaling_horizon + cases.long_time]:
+		var sim = fresh()
+		sim.cart.config.merge(cases.speed_vehicle.duplicate(true), true)
+		sim.cart.restart(0)
+		sim.elapsed = at
+		sim._announcement_at = at
+		sim.rng.seed = int(cases.seed)
+		var expected_rng := RandomNumberGenerator.new()
+		expected_rng.state = sim.rng.state
+		var multiplier := expected_rng.randf_range(1.0 - sim.config.train_speed_variation, 1.0 + sim.config.train_speed_variation)
+		sim._schedule()
+		check(sim.warnings.size() == 1, "Speed scenario creates one warning")
+		if sim.warnings.size() != 1:
+			continue
+		var warning: Dictionary = sim.warnings[0]
+		var base: float = lerpf(sim.config.train.speed, sim.config.final_train_speed, clampf(warning.spawn_at / sim.config.scaling_horizon, 0.0, 1.0))
+		var speed: float = warning.speed
+		check(near(speed, base * multiplier), "Warning samples speed from the arrival-time curve, clamped at the horizon")
+		var rng_state = sim.rng.state
+		sim._entry_assessment(warning.entry, warning.remaining, false, speed)
+		check(sim.rng.state == rng_state and warning.speed == speed, "Safety forecast preserves RNG and announced speed")
+		var blocker = sim._entry_train(warning.entry, 0.0)
+		sim.trains.append(blocker)
+		sim.elapsed = warning.spawn_at
+		sim._schedule()
+		check(sim.warnings.size() == 1 and sim.trains.size() == 1, "Occupied entry defers the variable-speed train")
+		check(warning.speed == speed and sim.rng.state == rng_state, "Blocked retry does not redraw speed")
+		sim.trains.clear()
+		sim.elapsed = warning.check_at
+		sim._schedule()
+		check(sim.trains.size() == 1 and sim.warnings.is_empty(), "Deferred train enters when clear")
+		if sim.trains.size() == 1:
+			check(sim.trains[0].config.speed == speed, "Deferred spawn preserves speed even at a later time")
+			var forecast = sim._forecast()
+			check(forecast.trains[0].config.speed == speed, "Forecast copies individual train speed")
+			sim._advance_to(sim.elapsed + cases.small_step, false)
+			check(sim.trains[0].config.speed == speed, "Moving train keeps its speed")
 
 
 func test_busy_entry() -> void:
@@ -458,6 +500,7 @@ func test_original_motion() -> void:
 func run() -> void:
 	cases = JSON.parse_string(FileAccess.get_file_as_string("res://config/traffic_test_cases.json"))
 	routes = JSON.parse_string(FileAccess.get_file_as_string("res://config/cart_test_cases.json")).routes
+	test_speed_progression()
 	test_entries_and_scheduler()
 	test_busy_entry()
 	test_routes_and_locks()

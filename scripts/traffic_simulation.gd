@@ -80,11 +80,13 @@ func toggle(id: String) -> bool:
 	return true
 
 
-func _entry_train(entry: String):
+func _entry_train(entry: String, speed: float = -1.0):
 	# Only the scalar vehicle settings differ; topology dictionaries/arrays stay shared.
 	var train = Simulation.new(cart.config.duplicate())
 	for key in config.train:
 		train.config[key] = config.train[key]
+	if speed >= 0.0:
+		train.config.speed = speed
 	train.switches = cart.switches
 	train.exits_safely = true
 	train.from_node = entry
@@ -169,13 +171,13 @@ func _entry_safe(entry: String, lead: float, defer_conflicting: bool = false) ->
 	return _entry_assessment(entry, lead, defer_conflicting).safe
 
 
-func _entry_assessment(entry: String, lead: float, defer_conflicting: bool = false) -> Dictionary:
+func _entry_assessment(entry: String, lead: float, defer_conflicting: bool = false, speed: float = -1.0) -> Dictionary:
 	var unsafe := {"safe": false, "threatening": false}
 	if elapsed + lead >= config.round_duration:
 		return unsafe
 	var budget := {"remaining": int(config.guard_motion_events), "exhausted": false}
 	var forecast = _forecast()
-	var plans: Array = [{"entry": entry, "at": elapsed + lead, "candidate": true}]
+	var plans: Array = [{"entry": entry, "at": elapsed + lead, "candidate": true, "speed": config.train.speed if speed < 0.0 else speed}]
 	var admitted: Array = []
 	var latest := elapsed + lead
 	for warning in warnings:
@@ -184,7 +186,7 @@ func _entry_assessment(entry: String, lead: float, defer_conflicting: bool = fal
 		var at: float = maxf(elapsed, warning.get("check_at", elapsed + warning.remaining))
 		if at >= config.round_duration:
 			continue
-		plans.append({"entry": warning.entry, "at": at, "candidate": false})
+		plans.append({"entry": warning.entry, "at": at, "candidate": false, "speed": warning.get("speed", config.train.speed)})
 		latest = maxf(latest, at)
 	plans.sort_custom(func(a, b): return a.at < b.at or (a.at == b.at and a.candidate and not b.candidate))
 	for plan in plans:
@@ -193,13 +195,13 @@ func _entry_assessment(entry: String, lead: float, defer_conflicting: bool = fal
 			return unsafe
 		if forecast.won:
 			return unsafe
-		var candidate = forecast._entry_train(plan.entry)
+		var candidate = forecast._entry_train(plan.entry, plan.speed)
 		if forecast._footprint_clear(candidate):
 			if defer_conflicting and not plan.candidate:
 				# A due spawn has priority over an incompatible hypothetical arrival.
 				# Its later retry will see the admitted train as actual traffic.
 				var joint = forecast._forecast()
-				joint.trains.append(joint._entry_train(plan.entry))
+				joint.trains.append(joint._entry_train(plan.entry, plan.speed))
 				joint._advance_to(latest + config.safety_duration, false, budget)
 				if budget.exhausted:
 					return unsafe
@@ -257,7 +259,7 @@ func _guard_replay(forecast, plans: Array, deadline: float, budget: Dictionary) 
 			return false
 		if forecast.won:
 			return true
-		var train = forecast._entry_train(plan.entry)
+		var train = forecast._entry_train(plan.entry, plan.speed)
 		if not forecast._footprint_clear(train):
 			return false
 		forecast.trains.append(train)
@@ -330,7 +332,7 @@ func _guard_decisions(plans: Array, deadline: float, budget: Dictionary) -> Dict
 			if budget.exhausted:
 				return {}
 			break
-		var train = arrivals._entry_train(plan.entry)
+		var train = arrivals._entry_train(plan.entry, plan.speed)
 		var itinerary := _guard_itinerary(train, plan.at, deadline, elapsed)
 		if itinerary.is_empty():
 			return {}
@@ -388,12 +390,12 @@ func _guard_witness(base, plans: Array, conflict_at: float, deadline: float, cha
 	return false
 
 
-func _pressure_weight(entry: String) -> float:
+func _pressure_weight(entry: String, speed: float = -1.0) -> float:
 	var rows: Array = []
 	for track in cart.config.get("tracks", []):
 		if cart.from_node in track.nodes or cart.to_node in track.nodes:
 			rows.append(track.nodes)
-	var candidate = _entry_train(entry)
+	var candidate = _entry_train(entry, speed)
 	candidate.switches = cart.switches.duplicate()
 	# The horizon is train travel time, excluding the warning lead.
 	var remaining: float = config.pressure_horizon * candidate.config.speed
@@ -444,13 +446,15 @@ func _schedule() -> void:
 			warning.spawn_at = elapsed + warning.remaining
 		if not warning.has("check_at"):
 			warning.check_at = warning.spawn_at
+		if not warning.has("speed"):
+			warning.speed = config.train.speed
 	for warning in warnings.duplicate():
 		if elapsed < warning.check_at:
 			continue
-		var candidate = _entry_train(warning.entry)
+		var candidate = _entry_train(warning.entry, warning.speed)
 		var assessment := {"safe": false, "threatening": false}
 		if _footprint_clear(candidate):
-			assessment = _entry_assessment(warning.entry, 0.0, true)
+			assessment = _entry_assessment(warning.entry, 0.0, true, warning.speed)
 		if assessment.safe:
 			trains.append(candidate)
 			_admitted_total += 1
@@ -466,6 +470,9 @@ func _schedule() -> void:
 		var arrival: float = elapsed + config.warning_duration + announced * config.warning_stagger
 		for warning in warnings:
 			arrival = maxf(arrival, warning.check_at + config.warning_stagger)
+		var base_speed: float = lerpf(config.train.speed, config.final_train_speed, clampf(arrival / config.scaling_horizon, 0.0, 1.0))
+		# Keep one draw for the warning, all safety replays and the actual train.
+		var speed: float = base_speed * rng.randf_range(1.0 - config.train_speed_variation, 1.0 + config.train_speed_variation)
 		var reactive: Array = []
 		var ambient: Array = []
 		var reserved_total := _admitted_total + warnings.size()
@@ -482,7 +489,7 @@ func _schedule() -> void:
 				if warning.entry == entry:
 					pending = true
 			if not pending:
-				var assessment := _entry_assessment(entry, arrival - elapsed)
+				var assessment := _entry_assessment(entry, arrival - elapsed, false, speed)
 				if assessment.safe:
 					var record := {"entry": entry, "threatening": assessment.threatening}
 					if assessment.threatening:
@@ -496,7 +503,7 @@ func _schedule() -> void:
 			_announcement_at = elapsed + config.retry_interval
 			break
 		for record in eligible:
-			var weight := _pressure_weight(record.entry)
+			var weight := _pressure_weight(record.entry, speed)
 			weights.append(weight)
 			total += weight
 		var draw := rng.randf() * total
@@ -506,7 +513,7 @@ func _schedule() -> void:
 			if draw < 0.0:
 				chosen = eligible[i]
 				break
-		warnings.append({"entry": chosen.entry, "threatening": chosen.threatening, "remaining": arrival - elapsed, "spawn_at": arrival, "check_at": arrival})
+		warnings.append({"entry": chosen.entry, "threatening": chosen.threatening, "remaining": arrival - elapsed, "spawn_at": arrival, "check_at": arrival, "speed": speed})
 		warning_created.emit()
 		announced += 1
 	_sync_schedule()

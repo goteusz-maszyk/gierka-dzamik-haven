@@ -3,6 +3,8 @@
   "final_interval": 1.44,
   "round_duration": 67.0,
   "scaling_horizon": 67.0,
+  "final_train_speed": 45.0,
+  "train_speed_variation": 0.1,
   "warning_duration": 1.44,
   "initial_max_warnings": 1,
   "max_warnings": 2,
