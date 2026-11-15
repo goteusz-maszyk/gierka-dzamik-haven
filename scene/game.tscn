@@ -34,6 +34,18 @@ anchors_preset = 0
 
 [node name="Sfx" parent="." unique_id=1222724206 instance=ExtResource("4_audio")]
 
+[node name="Switch" parent="Sfx" index="0"]
+volume_db = 0.0
+
+[node name="Buffer" parent="Sfx" index="1"]
+volume_db = 0.0
+
+[node name="Warning" parent="Sfx" index="2"]
+volume_db = 0.0
+
+[node name="Collision" parent="Sfx" index="3"]
+volume_db = 0.0
+
 [node name="Przegrana" type="AudioStreamPlayer" parent="Sfx" unique_id=2099483004]
 stream = ExtResource("6_qpk70")
 
