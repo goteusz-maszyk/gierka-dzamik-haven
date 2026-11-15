@@ -14,6 +14,7 @@ var elapsed := 0.0
 var lost := false
 var won := false
 var loss_reason := ""
+var loss_position := Vector2.ZERO
 var warnings: Array = []
 var rng := RandomNumberGenerator.new()
 var _until_warning: float
@@ -42,6 +43,7 @@ func restart() -> void:
 	lost = false
 	won = false
 	loss_reason = ""
+	loss_position = Vector2.ZERO
 	_admitted_total = 0
 	_admitted_threats = 0
 	_candidate_train = null
@@ -544,6 +546,7 @@ func _advance_to(deadline: float, spawning: bool, budget: Dictionary = {}) -> vo
 		var step := maxf(0.0, event_at - elapsed)
 		var collision := ""
 		var collision_candidate := false
+		var collision_pair: Array = []
 		for i in range(vehicles.size()):
 			for j in range(i + 1, vehicles.size()):
 				var interval := _contact_interval(vehicles[i], vehicles[j], _velocity(vehicles[i]), _velocity(vehicles[j]), step)
@@ -552,6 +555,7 @@ func _advance_to(deadline: float, spawning: bool, budget: Dictionary = {}) -> vo
 					event_at = elapsed + step
 					collision = "cart_train" if i == 0 else "train_train"
 					collision_candidate = vehicles[i] == _candidate_train or vehicles[j] == _candidate_train
+					collision_pair = [vehicles[i], vehicles[j]]
 		for vehicle in vehicles:
 			var distance: float = vehicle.distance_to_event()
 			var travel: float = step * vehicle.config.speed
@@ -561,13 +565,11 @@ func _advance_to(deadline: float, spawning: bool, budget: Dictionary = {}) -> vo
 		elapsed = event_at
 		if spawning:
 			_sync_schedule()
-		if not collision.is_empty() or cart.lost:
+		if not collision.is_empty():
 			lost = true
-			loss_reason = collision if not collision.is_empty() else "cart_exit"
+			loss_reason = collision
 			_loss_candidate = collision_candidate
-		for i in range(trains.size() - 1, -1, -1):
-			if trains[i].lost:
-				trains.remove_at(i)
+			loss_position = (collision_pair[0].cart_position() + collision_pair[1].cart_position()) / 2.0
 		# Check node rotations even when the caller's delta ends at this event.
 		vehicles = [cart] + trains
 		if not lost:
@@ -577,5 +579,15 @@ func _advance_to(deadline: float, spawning: bool, budget: Dictionary = {}) -> vo
 						lost = true
 						loss_reason = "cart_train" if i == 0 else "train_train"
 						_loss_candidate = vehicles[i] == _candidate_train or vehicles[j] == _candidate_train
+						loss_position = (vehicles[i].cart_position() + vehicles[j].cart_position()) / 2.0
+		if not lost and cart.lost:
+			lost = true
+			loss_reason = "cart_exit"
+			_loss_candidate = false
+			loss_position = cart.point(cart.to_node)
+		if not lost:
+			for i in range(trains.size() - 1, -1, -1):
+				if trains[i].lost:
+					trains.remove_at(i)
 	if lost:
 		_sync_schedule()

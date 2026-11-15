@@ -10,6 +10,9 @@
 texture_filter = 1
 script = ExtResource("1")
 
+[node name="BoardCamera" type="Camera2D" parent="."]
+position_smoothing_enabled = false
+
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1009868349]
 
 [node name="GiveUpBtn" type="Button" parent="CanvasLayer" unique_id=1723740496]

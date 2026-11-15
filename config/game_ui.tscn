@@ -86,6 +86,8 @@ metadata/train_train = "Two trains collided."
 
 [node name="Retry" type="Button" parent="LossOverlay/Panel"]
 layout_mode = 0
+focus_next = NodePath("../Menu")
+focus_previous = NodePath("../Menu")
 offset_left = 40.0
 offset_top = 66.0
 offset_right = 96.0
@@ -94,6 +96,8 @@ text = "Retry"
 
 [node name="Menu" type="Button" parent="LossOverlay/Panel"]
 layout_mode = 0
+focus_next = NodePath("../Retry")
+focus_previous = NodePath("../Retry")
 offset_left = 128.0
 offset_top = 66.0
 offset_right = 184.0
@@ -160,6 +164,8 @@ autowrap_mode = 2
 
 [node name="Retry" type="Button" parent="WinOverlay/Panel"]
 layout_mode = 0
+focus_next = NodePath("../Menu")
+focus_previous = NodePath("../Menu")
 offset_left = 40.0
 offset_top = 66.0
 offset_right = 96.0
@@ -168,6 +174,8 @@ text = "Retry"
 
 [node name="Menu" type="Button" parent="WinOverlay/Panel"]
 layout_mode = 0
+focus_next = NodePath("../Retry")
+focus_previous = NodePath("../Retry")
 offset_left = 128.0
 offset_top = 66.0
 offset_right = 184.0

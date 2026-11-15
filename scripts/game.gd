@@ -8,6 +8,11 @@ const MENU_PATH = "res://scene/main_menu.tscn"
 var traffic = Traffic.new()
 var simulation = traffic.cart
 var ui_config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/game_ui.json"))
+var loss_config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/loss_presentation.json"))
+var _loss_started := false
+var _loss_tween: Tween
+var _result_menu_state: Dictionary = {}
+@onready var board_camera: Camera2D = $BoardCamera
 @onready var status: Label = $CanvasLayer/GameUI/Status
 @onready var restart_button: BaseButton = $CanvasLayer/GameUI/LossOverlay/Panel/Retry
 @onready var menu_button: BaseButton = $CanvasLayer/GameUI/LossOverlay/Panel/Menu
@@ -29,6 +34,7 @@ var ui_config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res
 
 
 func _ready() -> void:
+	_reset_loss_presentation()
 	traffic.switch_changed.connect($Sfx/Switch.play)
 	traffic.warning_created.connect($Sfx/Warning.play)
 	traffic.train_spawned.connect(_on_train_spawned)
@@ -48,6 +54,7 @@ func _stop_sfx() -> void:
 
 
 func restart() -> void:
+	_reset_loss_presentation()
 	tutorial.finish()
 	_stop_sfx()
 	traffic.restart()
@@ -61,6 +68,7 @@ func restart() -> void:
 
 
 func give_up() -> void:
+	_reset_loss_presentation()
 	tutorial.finish()
 	_stop_sfx()
 	get_tree().change_scene_to_file(MENU_PATH)
@@ -85,14 +93,8 @@ func _update_ui() -> void:
 	status.text = text_format.format({"remaining": ceili(maxf(0.0, traffic.remaining_time())), "trains": traffic.trains.size()})
 	if traffic.lost:
 		win_overlay.hide()
-		if not loss_overlay.visible:
-			tutorial.finish()
-			_stop_sfx()
-			if traffic.loss_reason == "cart_train" or traffic.loss_reason == "train_train":
-				$Sfx/Collision.play()
-			loss_reason.text = loss_messages[traffic.loss_reason]
-			loss_overlay.show()
-			restart_button.grab_focus()
+		if not _loss_started:
+			_begin_loss_presentation()
 	elif traffic.won:
 		loss_overlay.hide()
 		if not win_overlay.visible:
@@ -100,7 +102,69 @@ func _update_ui() -> void:
 			_stop_sfx()
 			win_message.text = win_message_format.format({"duration": str(traffic.config.round_duration)})
 			win_overlay.show()
-			win_restart_button.grab_focus()
+			_prepare_result_controls()
+
+
+func _begin_loss_presentation() -> void:
+	_loss_started = true
+	tutorial.finish()
+	_stop_sfx()
+	if traffic.loss_reason == "cart_train" or traffic.loss_reason == "train_train":
+		$Sfx/Collision.play()
+	loss_reason.text = loss_messages[traffic.loss_reason]
+	var target_zoom := Vector2.ONE * maxf(1.0, float(loss_config.zoom))
+	var bounds := get_viewport_rect()
+	var half_view := bounds.size / target_zoom / 2.0
+	var target := Vector2(
+		clampf(traffic.loss_position.x, bounds.position.x + half_view.x, bounds.end.x - half_view.x),
+		clampf(traffic.loss_position.y, bounds.position.y + half_view.y, bounds.end.y - half_view.y))
+	_loss_tween = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_loss_tween.tween_interval(loss_config.freeze_duration)
+	_loss_tween.tween_property(board_camera, "position", target, loss_config.zoom_duration)
+	_loss_tween.parallel().tween_property(board_camera, "zoom", target_zoom, loss_config.zoom_duration)
+	_loss_tween.tween_interval(loss_config.hold_duration)
+	_loss_tween.tween_callback(_show_loss_panel)
+
+
+func _show_loss_panel() -> void:
+	if not _loss_started or not traffic.lost:
+		return
+	loss_overlay.show()
+	_prepare_result_controls()
+
+
+func _prepare_result_controls() -> void:
+	for button in [restart_button, menu_button, win_restart_button, win_menu_button]:
+		button.release_focus()
+	var gameplay_menu: BaseButton = $CanvasLayer/GiveUpBtn
+	if _result_menu_state.is_empty():
+		_result_menu_state = {"disabled": gameplay_menu.disabled, "focus_mode": gameplay_menu.focus_mode}
+	gameplay_menu.release_focus()
+	gameplay_menu.disabled = true
+	gameplay_menu.focus_mode = Control.FOCUS_NONE
+
+
+func _cancel_loss_tween() -> void:
+	if _loss_tween != null:
+		_loss_tween.kill()
+		_loss_tween = null
+
+
+func _reset_loss_presentation() -> void:
+	_cancel_loss_tween()
+	_loss_started = false
+	if not _result_menu_state.is_empty():
+		var gameplay_menu: BaseButton = $CanvasLayer/GiveUpBtn
+		gameplay_menu.disabled = _result_menu_state.disabled
+		gameplay_menu.focus_mode = _result_menu_state.focus_mode
+		_result_menu_state.clear()
+	board_camera.position = get_viewport_rect().get_center()
+	board_camera.zoom = Vector2.ONE
+	board_camera.force_update_scroll()
+
+
+func _exit_tree() -> void:
+	_cancel_loss_tween()
 
 
 func _unhandled_input(event: InputEvent) -> void:
