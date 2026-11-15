@@ -167,6 +167,7 @@ Bierne wlaczenie ma te same trzy dojscia, ale stala trase: wspolne prowadzi na p
 - Odtwarzacze sa wezlami sceny `config/game_audio.tscn`, instancjonowanej jako `Sfx` w `scene/game.tscn`. Tam sa ustawione glosnosci, maksymalna liczba nakladajacych sie efektow oraz listy wariantow w `AudioStreamRandomizer`, bez bezposredniego powtarzania tego samego wariantu. Losowanie dzwiekow nie korzysta z generatora losowego ruchu pociagow.
 - Dzwieki sa podlaczone tylko do zdarzen rzeczywistej symulacji i jej pojazdow. Kopie uzywane przez prognoze i ocene manewrow nie maja polaczen do odtwarzaczy.
 - Wszystkie efekty gry korzystaja z istniejacego busa SFX, aby respektowac glosnosc ustawiona w opcjach. Restart i powrot do menu zatrzymuja efekty; pokazanie wyniku wycisza poprzednie efekty przed ewentualnym dzwiekiem kolizji. Zakonczenie przyjazdow zatrzymuje dzwiek zapowiedzi; odbicia nadal sa slyszalne podczas oprozniania stacji. Istniejaca muzyka menu pozostaje bez zmian.
+- Muzyke menu (`assets/tomek_i_przyjaciele.mp3`) odtwarza wylacznie autoload `MusicManager` na busie `Music`. Scena menu nie ma drugiego odtwarzacza z autoplay, aby utwor nie gral podwojnie, takze w wyeksportowanej grze. Wejscie do opcji zatrzymuje muzyke, a powrot do menu uruchamia ja ponownie. Wejscie do gry i Retry zatrzymuja muzyke menedzera przed odtworzeniem osobnego motywu rozgrywki. Obecne dzialanie suwakow i muzyki rozgrywki pozostaje bez zmian.
 
 ### Tutorial pierwszej rozgrywki
 
