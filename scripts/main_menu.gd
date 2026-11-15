@@ -1,6 +1,7 @@
 extends Control
 
 func _ready() -> void:
+	MusicManager.stop_music()
 	MusicManager.play_music(preload("res://assets/tomek_i_przyjaciele.mp3"))
 
 func _on_start_btn_click() -> void:

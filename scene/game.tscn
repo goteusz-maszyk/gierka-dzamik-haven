@@ -5,6 +5,7 @@
 [ext_resource type="PackedScene" path="res://config/game_ui.tscn" id="3_ui"]
 [ext_resource type="PackedScene" path="res://config/game_audio.tscn" id="4_audio"]
 [ext_resource type="PackedScene" path="res://config/tutorial.tscn" id="5_tutorial"]
+[ext_resource type="AudioStream" uid="uid://b3m0ahf08k3t3" path="res://assets/przegrana.mp3" id="6_qpk70"]
 [ext_resource type="AudioStream" uid="uid://df10oypoqasjv" path="res://assets/ciuch_ciuch_theme.mp3" id="6_xlg7c"]
 
 [node name="Game" type="Node2D" unique_id=233003531]
@@ -33,6 +34,9 @@ anchors_preset = 0
 
 [node name="Sfx" parent="." unique_id=1222724206 instance=ExtResource("4_audio")]
 
+[node name="Przegrana" type="AudioStreamPlayer" parent="Sfx" unique_id=2099483004]
+stream = ExtResource("6_qpk70")
+
 [node name="CiuchCiuchTheme" type="AudioStreamPlayer" parent="." unique_id=1720798217]
 stream = ExtResource("6_xlg7c")
 bus = &"Music"
@@ -43,6 +47,7 @@ parameters/looping = true
 [connection signal="pressed" from="CanvasLayer/GameUI/LossOverlay/Panel/Menu" to="." method="give_up"]
 [connection signal="pressed" from="CanvasLayer/GameUI/WinOverlay/Panel/Retry" to="." method="restart"]
 [connection signal="pressed" from="CanvasLayer/GameUI/WinOverlay/Panel/Menu" to="." method="give_up"]
+[connection signal="finished" from="Sfx/Przegrana" to="." method="_on_deathsfx_finish"]
 
 [editable path="CanvasLayer/GameUI"]
 [editable path="CanvasLayer/Tutorial"]

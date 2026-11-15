@@ -172,8 +172,10 @@ func _show_loss_panel() -> void:
 	loss_overlay.show()
 	_prepare_result_controls()
 	$CiuchCiuchTheme.stop()
-	MusicManager.play_music(preload("res://assets/tomek_i_przyjaciele.mp3"))
+	$Sfx/Przegrana.play()
 
+func _on_deathsfx_finish() -> void:
+	MusicManager.play_music(preload("res://assets/tomek_i_przyjaciele.mp3"))
 
 func _prepare_result_controls() -> void:
 	for button in [restart_button, menu_button, win_restart_button, win_menu_button]:
