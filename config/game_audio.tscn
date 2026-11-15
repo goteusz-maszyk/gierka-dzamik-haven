@@ -1,0 +1,64 @@
+[gd_scene load_steps=15 format=3]
+
+[ext_resource type="AudioStream" path="res://assets/sfx/switch1.mp3" id="1_switch"]
+[ext_resource type="AudioStream" path="res://assets/sfx/switch2.mp3" id="2_switch"]
+[ext_resource type="AudioStream" path="res://assets/sfx/switch3.mp3" id="3_switch"]
+[ext_resource type="AudioStream" path="res://assets/sfx/boing1.mp3" id="4_buffer"]
+[ext_resource type="AudioStream" path="res://assets/sfx/boing2.mp3" id="5_buffer"]
+[ext_resource type="AudioStream" path="res://assets/sfx/boing3.mp3" id="6_buffer"]
+[ext_resource type="AudioStream" path="res://assets/sfx/boing4.mp3" id="7_buffer"]
+[ext_resource type="AudioStream" path="res://assets/sfx/ciuch1.mp3" id="8_warning"]
+[ext_resource type="AudioStream" path="res://assets/sfx/ciuch2.mp3" id="9_warning"]
+[ext_resource type="AudioStream" path="res://assets/sfx/ciuch3.mp3" id="10_warning"]
+[ext_resource type="AudioStream" path="res://assets/sfx/ciuch4.mp3" id="11_warning"]
+
+[sub_resource type="AudioStreamRandomizer" id="Randomizer_switch"]
+playback_mode = 0
+streams_count = 3
+stream_0/stream = ExtResource("1_switch")
+stream_0/weight = 1.0
+stream_1/stream = ExtResource("2_switch")
+stream_1/weight = 1.0
+stream_2/stream = ExtResource("3_switch")
+stream_2/weight = 1.0
+
+[sub_resource type="AudioStreamRandomizer" id="Randomizer_buffer"]
+playback_mode = 0
+streams_count = 4
+stream_0/stream = ExtResource("4_buffer")
+stream_0/weight = 1.0
+stream_1/stream = ExtResource("5_buffer")
+stream_1/weight = 1.0
+stream_2/stream = ExtResource("6_buffer")
+stream_2/weight = 1.0
+stream_3/stream = ExtResource("7_buffer")
+stream_3/weight = 1.0
+
+[sub_resource type="AudioStreamRandomizer" id="Randomizer_warning"]
+playback_mode = 0
+streams_count = 4
+stream_0/stream = ExtResource("8_warning")
+stream_0/weight = 1.0
+stream_1/stream = ExtResource("9_warning")
+stream_1/weight = 1.0
+stream_2/stream = ExtResource("10_warning")
+stream_2/weight = 1.0
+stream_3/stream = ExtResource("11_warning")
+stream_3/weight = 1.0
+
+[node name="Sfx" type="Node"]
+
+[node name="Switch" type="AudioStreamPlayer" parent="."]
+stream = SubResource("Randomizer_switch")
+volume_db = -10.0
+max_polyphony = 2
+
+[node name="Buffer" type="AudioStreamPlayer" parent="."]
+stream = SubResource("Randomizer_buffer")
+volume_db = -12.0
+max_polyphony = 3
+
+[node name="Warning" type="AudioStreamPlayer" parent="."]
+stream = SubResource("Randomizer_warning")
+volume_db = -8.0
+max_polyphony = 2

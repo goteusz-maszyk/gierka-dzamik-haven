@@ -1,5 +1,9 @@
 extends RefCounted
 
+signal switch_changed
+signal warning_created
+signal train_spawned(train)
+
 const Simulation = preload("res://scripts/cart_simulation.gd")
 const CONFIG_PATH = "res://config/traffic.json"
 
@@ -70,6 +74,7 @@ func toggle(id: String) -> bool:
 	if lost or won or not cart.switches.has(id) or is_locked(id):
 		return false
 	cart.switches[id] = 1 - cart.switches[id]
+	switch_changed.emit()
 	return true
 
 
@@ -451,6 +456,7 @@ func _schedule() -> void:
 				_admitted_threats += 1
 			warnings.erase(warning)
 			_announcement_at = elapsed + lerpf(config.initial_interval, config.final_interval, clampf(elapsed / config.scaling_horizon, 0.0, 1.0))
+			train_spawned.emit(candidate)
 		else:
 			warning.check_at = elapsed + config.retry_interval
 	var announced := 0
@@ -499,6 +505,7 @@ func _schedule() -> void:
 				chosen = eligible[i]
 				break
 		warnings.append({"entry": chosen.entry, "threatening": chosen.threatening, "remaining": arrival - elapsed, "spawn_at": arrival, "check_at": arrival})
+		warning_created.emit()
 		announced += 1
 	_sync_schedule()
 

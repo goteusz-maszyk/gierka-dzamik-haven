@@ -27,10 +27,24 @@ var ui_config: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res
 
 
 func _ready() -> void:
+	traffic.switch_changed.connect($Sfx/Switch.play)
+	traffic.warning_created.connect($Sfx/Warning.play)
+	traffic.train_spawned.connect(_on_train_spawned)
+	simulation.buffer_hit.connect($Sfx/Buffer.play)
 	_update_ui()
 
 
+func _on_train_spawned(train) -> void:
+	train.buffer_hit.connect($Sfx/Buffer.play)
+
+
+func _stop_sfx() -> void:
+	for player in $Sfx.get_children():
+		player.stop()
+
+
 func restart() -> void:
+	_stop_sfx()
 	traffic.restart()
 	simulation = traffic.cart
 	for button in [restart_button, menu_button, win_restart_button, win_menu_button]:
@@ -42,11 +56,15 @@ func restart() -> void:
 
 
 func give_up() -> void:
+	_stop_sfx()
 	get_tree().change_scene_to_file(MENU_PATH)
 
 
 func _process(delta: float) -> void:
+	var was_clearing: bool = traffic.is_clearing()
 	traffic.advance(delta)
+	if not was_clearing and traffic.is_clearing():
+		$Sfx/Warning.stop()
 	_update_ui()
 	queue_redraw()
 
@@ -57,12 +75,14 @@ func _update_ui() -> void:
 	if traffic.lost:
 		win_overlay.hide()
 		if not loss_overlay.visible:
+			_stop_sfx()
 			loss_reason.text = loss_messages[traffic.loss_reason]
 			loss_overlay.show()
 			restart_button.grab_focus()
 	elif traffic.won:
 		loss_overlay.hide()
 		if not win_overlay.visible:
+			_stop_sfx()
 			win_message.text = win_message_format.format({"duration": str(traffic.config.round_duration)})
 			win_overlay.show()
 			win_restart_button.grab_focus()

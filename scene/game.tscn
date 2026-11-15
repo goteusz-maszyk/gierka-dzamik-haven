@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://dli4d5o7d5wih" path="res://scripts/game.gd" id="1"]
 [ext_resource type="PackedScene" uid="uid://b05o6ky4kg05v" path="res://scene/button.tscn" id="2_dbls1"]
 [ext_resource type="PackedScene" path="res://config/game_ui.tscn" id="3_ui"]
+[ext_resource type="PackedScene" path="res://config/game_audio.tscn" id="4_audio"]
 
 [node name="Game" type="Node2D" unique_id=233003531]
 script = ExtResource("1")
@@ -18,6 +19,8 @@ text = "Give Up"
 
 [node name="GameUI" parent="CanvasLayer" instance=ExtResource("3_ui")]
 
+[node name="Sfx" parent="." instance=ExtResource("4_audio")]
+
 [connection signal="button_down" from="CanvasLayer/GiveUpBtn" to="." method="give_up"]
 [connection signal="pressed" from="CanvasLayer/GameUI/LossOverlay/Panel/Retry" to="." method="restart"]
 [connection signal="pressed" from="CanvasLayer/GameUI/LossOverlay/Panel/Menu" to="." method="give_up"]
@@ -25,3 +28,4 @@ text = "Give Up"
 [connection signal="pressed" from="CanvasLayer/GameUI/WinOverlay/Panel/Menu" to="." method="give_up"]
 
 [editable path="CanvasLayer/GameUI"]
+[editable path="Sfx"]

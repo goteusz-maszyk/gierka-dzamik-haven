@@ -1,5 +1,7 @@
 extends RefCounted
 
+signal buffer_hit
+
 const CONFIG_PATH = "res://config/cart_prototype.json"
 
 var config: Dictionary
@@ -111,5 +113,7 @@ func advance_distance(remaining: float) -> void:
 				rear_locks[arrived] = config.cart_length / 2.0
 		from_node = arrived
 		progress = 0.0
+		if arrived in config.buffers:
+			buffer_hit.emit()
 		if remaining <= 0.0:
 			break

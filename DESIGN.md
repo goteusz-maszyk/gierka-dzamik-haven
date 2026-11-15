@@ -144,6 +144,15 @@ Bierne wlaczenie ma te same trzy dojscia, ale stala trase: wspolne prowadzi na p
 - Granica 67 sekund jest osobnym zdarzeniem symulacji: nie moze w niej rozpoczac sie spawn ani zapowiedz. Kolizja, obrot pojazdu powodujacy kolizje lub wyjazd wagonika na tej granicy lub podczas oprozniania nadal oznacza przegrana. Gdy wyjazd ostatniego pociagu i przegrana sa rownoczesne, pierwszenstwo ma przegrana. Po wygranej nie symulujemy dalszej czesci klatki.
 - Restart po obu wynikach zeruje czas, pociagi, zapowiedz, harmonogram spawnu i jego ponownych kontroli, powod przegranej i stan wygranej oraz odtwarza ustawienia zwrotnic, losuje start wagonika i ukrywa obie nakladki.
 
+### Efekty dzwiekowe prototypu
+
+- Udane przelaczenie zwrotnicy odtwarza jeden z `assets/sfx/switch1.mp3` do `switch3.mp3`. Klikniecie zajetej zwrotnicy lub biernego wlaczenia nie odtwarza efektu.
+- Rzeczywiste odbicie wagonika gracza lub pociagu od odbijaka odtwarza jeden z `assets/sfx/boing1.mp3` do `boing4.mp3`.
+- Utworzenie nowej zapowiedzi odtwarza jeden z `assets/sfx/ciuch1.mp3` do `ciuch4.mp3`. Sam spawn i ponowne sprawdzanie zablokowanego wjazdu nie powtarzaja tego dzwieku. Dwie zapowiedzi moga odtworzyc dwa efekty z ograniczona polifonia.
+- Odtwarzacze sa wezlami sceny `config/game_audio.tscn`, instancjonowanej jako `Sfx` w `scene/game.tscn`. Tam sa ustawione glosnosci, maksymalna liczba nakladajacych sie efektow oraz listy wariantow w `AudioStreamRandomizer`, bez bezposredniego powtarzania tego samego wariantu. Losowanie dzwiekow nie korzysta z generatora losowego ruchu pociagow.
+- Dzwieki sa podlaczone tylko do zdarzen rzeczywistej symulacji i jej pojazdow. Kopie uzywane przez prognoze i ocene manewrow nie maja polaczen do odtwarzaczy.
+- Restart, powrot do menu i pokazanie wyniku zatrzymuja efekty. Zakonczenie przyjazdow zatrzymuje dzwiek zapowiedzi; odbicia nadal sa slyszalne podczas oprozniania stacji. Istniejaca muzyka menu pozostaje bez zmian.
+
 ## Otwarte decyzje
 
 Ponizsze szczegoly nie sa jeszcze uzgodnionymi zasadami i wymagaja ustalenia przed implementacja danej mechaniki:
