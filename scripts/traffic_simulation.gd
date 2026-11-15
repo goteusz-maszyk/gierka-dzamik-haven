@@ -16,6 +16,10 @@ var _until_warning: float
 var _scheduler_at := 0.0
 var _warning_at := INF
 var _announcement_at := INF
+var _admitted_total := 0
+var _admitted_threats := 0
+var _candidate_train
+var _loss_candidate := false
 
 
 func _init(initialize: bool = true) -> void:
@@ -34,6 +38,10 @@ func restart() -> void:
 	lost = false
 	won = false
 	loss_reason = ""
+	_admitted_total = 0
+	_admitted_threats = 0
+	_candidate_train = null
+	_loss_candidate = false
 	_until_warning = config.first_warning_delay
 	_scheduler_at = _until_warning
 	_announcement_at = _scheduler_at
@@ -143,15 +151,25 @@ func _forecast():
 	forecast.elapsed = elapsed
 	forecast.cart = _copy_vehicle(cart, cart.switches.duplicate())
 	for train in trains:
-		forecast.trains.append(_copy_vehicle(train, forecast.cart.switches))
+		var copy = _copy_vehicle(train, forecast.cart.switches)
+		forecast.trains.append(copy)
+		if train == _candidate_train:
+			forecast._candidate_train = copy
 	return forecast
 
 
 func _entry_safe(entry: String, lead: float, defer_conflicting: bool = false) -> bool:
+	return _entry_assessment(entry, lead, defer_conflicting).safe
+
+
+func _entry_assessment(entry: String, lead: float, defer_conflicting: bool = false) -> Dictionary:
+	var unsafe := {"safe": false, "threatening": false}
 	if elapsed + lead >= config.round_duration:
-		return false
+		return unsafe
+	var budget := {"remaining": int(config.guard_motion_events), "exhausted": false}
 	var forecast = _forecast()
 	var plans: Array = [{"entry": entry, "at": elapsed + lead, "candidate": true}]
+	var admitted: Array = []
 	var latest := elapsed + lead
 	for warning in warnings:
 		if warning.entry == entry:
@@ -163,11 +181,11 @@ func _entry_safe(entry: String, lead: float, defer_conflicting: bool = false) ->
 		latest = maxf(latest, at)
 	plans.sort_custom(func(a, b): return a.at < b.at or (a.at == b.at and a.candidate and not b.candidate))
 	for plan in plans:
-		forecast._advance_to(plan.at, false)
-		if forecast.lost:
-			return false
+		forecast._advance_to(plan.at, false, budget)
+		if forecast.lost or budget.exhausted:
+			return unsafe
 		if forecast.won:
-			return true
+			return unsafe
 		var candidate = forecast._entry_train(plan.entry)
 		if forecast._footprint_clear(candidate):
 			if defer_conflicting and not plan.candidate:
@@ -175,14 +193,192 @@ func _entry_safe(entry: String, lead: float, defer_conflicting: bool = false) ->
 				# Its later retry will see the admitted train as actual traffic.
 				var joint = forecast._forecast()
 				joint.trains.append(joint._entry_train(plan.entry))
-				joint._advance_to(latest + config.safety_duration, false)
+				joint._advance_to(latest + config.safety_duration, false, budget)
+				if budget.exhausted:
+					return unsafe
 				if joint.lost:
 					continue
 			forecast.trains.append(candidate)
-		elif plan.candidate:
+			if plan.candidate:
+				forecast._candidate_train = candidate
+			admitted.append(plan)
+		elif plan.candidate or not defer_conflicting:
+			return unsafe
+	forecast._advance_to(latest + config.safety_duration, false, budget)
+	if forecast.lost or budget.exhausted:
+		return unsafe
+	return _maneuver_assessment(admitted, latest, budget)
+
+
+func _guard_itinerary(vehicle, start: float, deadline: float, react_at: float, extend_first: bool = false, after_choice: float = -INF) -> Dictionary:
+	if vehicle.config.speed <= 0.0:
+		return {}
+	var probe = _copy_vehicle(vehicle, vehicle.switches.duplicate())
+	var at := start
+	var decisions: Array = []
+	var found_first := false
+	for iteration in range(int(config.guard_route_iterations)):
+		var distance: float = probe.distance_to_event()
+		if not is_finite(distance) or distance < 0.0:
+			return {}
+		var arrival: float = at + distance / probe.config.speed
+		if probe.switches.has(probe.to_node):
+			var ports: Array = probe.config.switches[probe.to_node].ports
+			if probe.from_node == ports[0]:
+				var front_at: float = arrival - probe.config.cart_length / (2.0 * probe.config.speed)
+				var click_at: float = front_at - config.guard_reaction_time
+				if click_at >= react_at + config.guard_reaction_time and click_at > after_choice:
+					var clear_at: float = arrival + probe.config.cart_length / (2.0 * probe.config.speed)
+					decisions.append({"id": probe.to_node, "at": click_at, "clear_at": clear_at})
+					if extend_first and not found_first:
+						deadline = maxf(deadline, clear_at + config.safety_duration)
+					found_first = true
+		if arrival >= deadline and (not extend_first or not decisions.is_empty()):
+			return {"deadline": deadline, "decisions": decisions}
+		at = arrival
+		probe.advance_distance(distance)
+		if probe.lost:
+			return {"deadline": maxf(deadline, at) if extend_first else deadline, "decisions": decisions}
+	return {}
+
+
+func _guard_replay(forecast, plans: Array, deadline: float, budget: Dictionary) -> bool:
+	while not plans.is_empty() and plans[0].at <= deadline:
+		var plan: Dictionary = plans.pop_front()
+		forecast._advance_to(plan.at, false, budget)
+		if forecast.lost or budget.exhausted:
 			return false
-	forecast._advance_to(latest + config.safety_duration, false)
-	return not forecast.lost
+		if forecast.won:
+			return true
+		var train = forecast._entry_train(plan.entry)
+		if not forecast._footprint_clear(train):
+			return false
+		forecast.trains.append(train)
+		if plan.candidate:
+			forecast._candidate_train = train
+	forecast._advance_to(deadline, false, budget)
+	return not forecast.lost and not budget.exhausted
+
+
+func _maneuver_assessment(plans: Array, latest: float, budget: Dictionary) -> Dictionary:
+	var unsafe := {"safe": false, "threatening": false}
+	var deadline: float = latest + config.pressure_horizon
+	# Choices passed before the candidate arrives cannot excuse an already boxed cart.
+	var at_spawn = _forecast()
+	var pending: Array = plans.duplicate()
+	var spawn_at := elapsed
+	for plan in plans:
+		if plan.candidate:
+			spawn_at = plan.at
+	if not _guard_replay(at_spawn, pending, spawn_at, budget):
+		return unsafe
+	deadline = _guard_deadline(at_spawn.cart, spawn_at, plans, deadline, budget)
+	if not is_finite(deadline):
+		return unsafe
+	var noop = _forecast()
+	if _guard_replay(noop, plans.duplicate(), deadline, budget):
+		return {"safe": true, "threatening": false}
+	if budget.exhausted:
+		return unsafe
+	var conflict_at: float = noop.elapsed
+	var attempts := {"remaining": int(config.guard_attempts) - 1}
+	var safe := _guard_witness(_forecast(), plans, conflict_at, conflict_at + config.safety_duration, int(config.guard_max_changes), attempts, budget, [])
+	return {"safe": safe, "threatening": safe and noop.loss_reason == "cart_train" and noop._loss_candidate}
+
+
+func _guard_deadline(vehicle, start: float, plans: Array, deadline: float, budget: Dictionary) -> float:
+	var after_choice := -INF
+	for iteration in range(int(config.guard_route_iterations)):
+		var itinerary := _guard_itinerary(vehicle, start, deadline, elapsed, true, after_choice)
+		if itinerary.is_empty():
+			return INF
+		deadline = itinerary.deadline
+		if itinerary.decisions.is_empty():
+			# The shared replay must reject the cart exit (unless the round wins first).
+			return deadline
+		var decision: Dictionary = itinerary.decisions[0]
+		var probe = _forecast()
+		if not _guard_replay(probe, plans.duplicate(), decision.at, budget):
+			# A conflict before the choice requires a witness, not a no-op approval.
+			return INF if budget.exhausted else deadline
+		if not probe.is_locked(decision.id):
+			return deadline
+		after_choice = decision.at
+	return INF
+
+
+func _guard_decisions(plans: Array, deadline: float, budget: Dictionary) -> Dictionary:
+	var decisions: Array = []
+	for vehicle in [cart] + trains:
+		var itinerary := _guard_itinerary(vehicle, elapsed, deadline, elapsed)
+		if itinerary.is_empty():
+			return {}
+		decisions.append_array(itinerary.decisions)
+	var arrivals = _forecast()
+	var pending: Array = plans.duplicate()
+	for plan in plans:
+		if plan.at >= deadline:
+			break
+		if not _guard_replay(arrivals, pending, plan.at, budget):
+			if budget.exhausted:
+				return {}
+			break
+		var train = arrivals._entry_train(plan.entry)
+		var itinerary := _guard_itinerary(train, plan.at, deadline, elapsed)
+		if itinerary.is_empty():
+			return {}
+		decisions.append_array(itinerary.decisions)
+	decisions.sort_custom(func(a, b): return a.at < b.at)
+	return {"decisions": decisions}
+
+
+func _guard_witness(base, plans: Array, conflict_at: float, deadline: float, changes: int, attempts: Dictionary, budget: Dictionary, selected: Array) -> bool:
+	if changes <= 0 or attempts.remaining <= 0 or budget.exhausted:
+		return false
+	var choices: Dictionary = base._guard_decisions(plans, conflict_at, budget)
+	if choices.is_empty():
+		return false
+	var seen: Dictionary = {}
+	for decision in choices.decisions:
+		if decision.at >= conflict_at or attempts.remaining <= 0 or budget.exhausted:
+			break
+		var key: String = decision.id + ":" + str(decision.at)
+		if seen.has(key):
+			continue
+		seen[key] = true
+		attempts.remaining -= 1
+		var witness = base._forecast()
+		var pending: Array = plans.duplicate()
+		if not _guard_replay(witness, pending, decision.at, budget):
+			continue
+		# Shared front/rear locks are checked at the click, never in the live state.
+		if not witness.toggle(decision.id):
+			continue
+		var changed_ids: Array = selected.duplicate()
+		changed_ids.append(decision.id)
+		var changed = witness._forecast()
+		var changed_deadline: float = maxf(deadline, decision.clear_at + config.safety_duration)
+		var changed_pending: Array = pending.duplicate()
+		var safe := _guard_replay(changed, changed_pending, changed_deadline, budget)
+		var locked := false
+		for id in changed_ids:
+			locked = locked or changed.is_locked(id)
+		if safe and locked and not changed.won:
+			var clearance := 0.0
+			for vehicle in [changed.cart] + changed.trains:
+				if vehicle.config.speed <= 0.0:
+					return false
+				clearance = maxf(clearance, vehicle.config.cart_length / vehicle.config.speed)
+			changed_deadline += clearance + config.safety_duration
+			safe = _guard_replay(changed, changed_pending, changed_deadline, budget)
+			locked = false
+			for id in changed_ids:
+				locked = locked or changed.is_locked(id)
+		if safe and (changed.won or not locked):
+			return true
+		if not safe and not budget.exhausted and _guard_witness(witness, pending, changed.elapsed, maxf(changed_deadline, changed.elapsed + config.safety_duration), changes - 1, attempts, budget, changed_ids):
+			return true
+	return false
 
 
 func _pressure_weight(entry: String) -> float:
@@ -245,8 +441,14 @@ func _schedule() -> void:
 		if elapsed < warning.check_at:
 			continue
 		var candidate = _entry_train(warning.entry)
-		if _footprint_clear(candidate) and _entry_safe(warning.entry, 0.0, true):
+		var assessment := {"safe": false, "threatening": false}
+		if _footprint_clear(candidate):
+			assessment = _entry_assessment(warning.entry, 0.0, true)
+		if assessment.safe:
 			trains.append(candidate)
+			_admitted_total += 1
+			if assessment.threatening:
+				_admitted_threats += 1
 			warnings.erase(warning)
 			_announcement_at = elapsed + lerpf(config.initial_interval, config.final_interval, clampf(elapsed / config.scaling_horizon, 0.0, 1.0))
 		else:
@@ -256,7 +458,14 @@ func _schedule() -> void:
 		var arrival: float = elapsed + config.warning_duration + announced * config.warning_stagger
 		for warning in warnings:
 			arrival = maxf(arrival, warning.check_at + config.warning_stagger)
-		var eligible: Array = []
+		var reactive: Array = []
+		var ambient: Array = []
+		var reserved_total := _admitted_total + warnings.size()
+		var reserved_threats := _admitted_threats
+		for warning in warnings:
+			if warning.get("threatening", false):
+				reserved_threats += 1
+		var prefer_threat: bool = reserved_total == 0 or reserved_threats < config.pressure_target_fraction * reserved_total
 		var weights: Array[float] = []
 		var total := 0.0
 		for entry in cart.config.exits:
@@ -264,22 +473,32 @@ func _schedule() -> void:
 			for warning in warnings:
 				if warning.entry == entry:
 					pending = true
-			if not pending and _entry_safe(entry, arrival - elapsed):
-				eligible.append(entry)
-				var weight := _pressure_weight(entry)
-				weights.append(weight)
-				total += weight
+			if not pending:
+				var assessment := _entry_assessment(entry, arrival - elapsed)
+				if assessment.safe:
+					var record := {"entry": entry, "threatening": assessment.threatening}
+					if assessment.threatening:
+						reactive.append(record)
+					else:
+						ambient.append(record)
+		var eligible: Array = reactive if prefer_threat else ambient
+		if eligible.is_empty():
+			eligible = ambient if prefer_threat else reactive
 		if eligible.is_empty():
 			_announcement_at = elapsed + config.retry_interval
 			break
+		for record in eligible:
+			var weight := _pressure_weight(record.entry)
+			weights.append(weight)
+			total += weight
 		var draw := rng.randf() * total
-		var chosen: String = eligible.back()
+		var chosen: Dictionary = eligible.back()
 		for i in range(eligible.size()):
 			draw -= weights[i]
 			if draw < 0.0:
 				chosen = eligible[i]
 				break
-		warnings.append({"entry": chosen, "remaining": arrival - elapsed, "spawn_at": arrival, "check_at": arrival})
+		warnings.append({"entry": chosen.entry, "threatening": chosen.threatening, "remaining": arrival - elapsed, "spawn_at": arrival, "check_at": arrival})
 		announced += 1
 	_sync_schedule()
 
@@ -290,8 +509,13 @@ func advance(delta: float) -> void:
 	_advance_to(elapsed + delta, config.spawning_enabled)
 
 
-func _advance_to(deadline: float, spawning: bool) -> void:
+func _advance_to(deadline: float, spawning: bool, budget: Dictionary = {}) -> void:
 	while not lost and not won:
+		if not budget.is_empty():
+			if budget.remaining <= 0:
+				budget.exhausted = true
+				return
+			budget.remaining -= 1
 		if is_clearing():
 			_sync_schedule()
 			if trains.is_empty():
@@ -312,6 +536,7 @@ func _advance_to(deadline: float, spawning: bool) -> void:
 			event_at = minf(event_at, _scheduler_at)
 		var step := maxf(0.0, event_at - elapsed)
 		var collision := ""
+		var collision_candidate := false
 		for i in range(vehicles.size()):
 			for j in range(i + 1, vehicles.size()):
 				var interval := _contact_interval(vehicles[i], vehicles[j], _velocity(vehicles[i]), _velocity(vehicles[j]), step)
@@ -319,6 +544,7 @@ func _advance_to(deadline: float, spawning: bool) -> void:
 					step = interval[0]
 					event_at = elapsed + step
 					collision = "cart_train" if i == 0 else "train_train"
+					collision_candidate = vehicles[i] == _candidate_train or vehicles[j] == _candidate_train
 		for vehicle in vehicles:
 			var distance: float = vehicle.distance_to_event()
 			var travel: float = step * vehicle.config.speed
@@ -331,6 +557,7 @@ func _advance_to(deadline: float, spawning: bool) -> void:
 		if not collision.is_empty() or cart.lost:
 			lost = true
 			loss_reason = collision if not collision.is_empty() else "cart_exit"
+			_loss_candidate = collision_candidate
 		for i in range(trains.size() - 1, -1, -1):
 			if trains[i].lost:
 				trains.remove_at(i)
@@ -342,5 +569,6 @@ func _advance_to(deadline: float, spawning: bool) -> void:
 					if _contact_interval(vehicles[i], vehicles[j], Vector2.ZERO, Vector2.ZERO, 0.0)[0] == 0.0:
 						lost = true
 						loss_reason = "cart_train" if i == 0 else "train_train"
+						_loss_candidate = vehicles[i] == _candidate_train or vehicles[j] == _candidate_train
 	if lost:
 		_sync_schedule()
