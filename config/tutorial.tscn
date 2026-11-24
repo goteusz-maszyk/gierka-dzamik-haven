@@ -70,6 +70,22 @@ autowrap_mode = 2
 metadata/highlight = "cart"
 metadata/action = "next"
 
+[node name="Exits" type="Label" parent="Panel/Pages"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 9
+text = "Trains enter and leave at open track ends.\nIf your carriage exits, you lose."
+autowrap_mode = 2
+metadata/highlight = "exits"
+metadata/action = "next"
+metadata/panel_offset_y = -54.0
+
 [node name="Bumpers" type="Label" parent="Panel/Pages"]
 visible = false
 layout_mode = 1

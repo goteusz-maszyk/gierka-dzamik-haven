@@ -16,6 +16,7 @@ var settings: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res:
 @onready var progress_format: String = progress.text
 @onready var next_text: String = next_button.text
 @onready var goal_format: String = $Panel/Pages/Goal.text
+@onready var panel_top: float = $Panel.position.y
 
 
 func begin(game_scene) -> void:
@@ -90,6 +91,7 @@ func _on_buffer_hit() -> void:
 func _show_page() -> void:
 	for index in range(pages.size()):
 		pages[index].visible = index == step
+	$Panel.position.y = panel_top + float(pages[step].get_meta("panel_offset_y", 0.0))
 	var action: String = pages[step].get_meta("action")
 	var can_advance := action != "switch" and not _demo_running
 	next_button.visible = can_advance
@@ -162,14 +164,19 @@ func _draw() -> void:
 	if not active:
 		return
 	var points: Array[Vector2] = []
+	var radius: float = settings.highlight_radius
 	match pages[step].get_meta("highlight", "none"):
 		"cart":
 			points.append(game.simulation.cart_position())
 		"buffers":
 			for id in settings.highlight_buffers:
 				points.append(game.simulation.point(id))
+		"exits":
+			radius = settings.exit_highlight_radius
+			for id in game.simulation.config.exits:
+				points.append(game.simulation.point(id))
 		"switch":
 			points.append(game.simulation.point(settings.switch_id))
 	var board_to_local: Transform2D = get_global_transform_with_canvas().affine_inverse() * game.get_global_transform_with_canvas()
 	for point in points:
-		draw_circle(board_to_local * point, settings.highlight_radius, Color(settings.highlight_color), false, settings.highlight_width)
+		draw_circle(board_to_local * point, radius, Color(settings.highlight_color), false, settings.highlight_width)

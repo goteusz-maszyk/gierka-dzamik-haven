@@ -5,14 +5,17 @@ extends Control
 
 func _ready() -> void:
 	MusicManager.stop_music()
-	var music_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Music"))
-	music_slider.value = music_slider.max_value - db_to_linear(music_db)
+	_sync_volume_slider(music_slider, "Music")
+	_sync_volume_slider(sfx_slider, "SFX")
 
-	var sfx_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index("SFX"))
-	sfx_slider.value = db_to_linear(sfx_db) * sfx_slider.max_value
+func _sync_volume_slider(slider: HSlider, bus_name: String) -> void:
+	var volume_db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index(bus_name))
+	var value := db_to_linear(volume_db) * slider.max_value
+	# Reserve the left endpoint for silence, even for levels below one slider step.
+	slider.set_value_no_signal(maxf(value, slider.step) if value > 0.0 else 0.0)
 
 func _on_music_slider(value: float) -> void:
-	_set_bus_volume("Music", music_slider.max_value - value)
+	_set_bus_volume("Music", value / music_slider.max_value)
 
 func _on_sfx_slider(value: float) -> void:
 	_set_bus_volume("SFX", value / sfx_slider.max_value)
