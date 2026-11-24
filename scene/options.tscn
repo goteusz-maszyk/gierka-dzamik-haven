@@ -59,9 +59,7 @@ vertical_alignment = 1
 [node name="MusicVolumeSlider" type="HSlider" parent="PanelContainer/OptionsContainer/VBoxContainer" unique_id=1804427340]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
-max_value = 2.0
-step = 0.05
-value = 1.0
+value = 100.0
 
 [node name="VBoxContainer2" type="HBoxContainer" parent="PanelContainer/OptionsContainer" unique_id=1836158706]
 layout_mode = 2
