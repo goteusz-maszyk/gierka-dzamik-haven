@@ -268,6 +268,9 @@ func _draw() -> void:
 		draw_line(center - arm, center + arm, Color(v.buffer), v.buffer_width)
 	for id in config.exits:
 		draw_circle(simulation.point(id), v.exit_radius, Color(v.exit))
+	for id in config.entries:
+		if id not in config.exits:
+			draw_circle(simulation.point(id), v.exit_radius, Color(v.entry_only))
 	for id in simulation.switches:
 		var center: Vector2 = simulation.point(id)
 		var color := Color(v.locked if traffic.is_locked(id) else v.switch)

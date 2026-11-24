@@ -50,7 +50,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 9
-text = "Keep your carriage inside and avoid all crashes. After {duration}s, guide the remaining trains out."
+text = "Keep your carriage inside and avoid crashes. After {duration}s, guide trains out at red exits."
 autowrap_mode = 2
 metadata/highlight = "cart"
 metadata/action = "next"
@@ -65,10 +65,11 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 9
-text = "Welcome to Zadupiowice Dolne. This runaway carriage is yours to keep safe."
+text = "Welcome to Zadupiowice Dolne.\nBlue track ends are train entrances only."
 autowrap_mode = 2
 metadata/highlight = "cart"
 metadata/action = "next"
+metadata/panel_offset_y = -54.0
 
 [node name="Bumpers" type="Label" parent="Panel/Pages"]
 visible = false

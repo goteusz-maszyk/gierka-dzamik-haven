@@ -483,7 +483,7 @@ func _schedule() -> void:
 		var prefer_threat: bool = reserved_total == 0 or reserved_threats < config.pressure_target_fraction * reserved_total
 		var weights: Array[float] = []
 		var total := 0.0
-		for entry in cart.config.exits:
+		for entry in cart.config.get("entries", cart.config.exits):
 			var pending := false
 			for warning in warnings:
 				if warning.entry == entry:

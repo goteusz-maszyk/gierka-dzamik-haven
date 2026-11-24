@@ -65,7 +65,7 @@ func run() -> void:
 	check(game.traffic.warnings.size() == 2 and game.traffic.trains.is_empty(), "First real scheduler event exposes two pending warnings")
 	var pending: Array = game.traffic.warnings.duplicate(true)
 	for warning in pending:
-		check(warning.entry in game.simulation.config.exits and warning.remaining > 0.0 and warning.spawn_at == warning.check_at, "Visible warning data names a real entry and future arrival")
+		check(warning.entry in game.simulation.config.entries and warning.remaining > 0.0 and warning.spawn_at == warning.check_at, "Visible warning data names a real entry and future arrival")
 	if pending.size() == 2:
 		check(pending[0].entry != pending[1].entry and pending[0].spawn_at < pending[1].spawn_at, "Both warnings have independent entries and staggered arrivals")
 	if DisplayServer.get_name() != "headless":
