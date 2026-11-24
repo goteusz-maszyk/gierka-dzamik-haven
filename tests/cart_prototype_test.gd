@@ -54,11 +54,11 @@ func test_topology(sim) -> void:
 	var config: Dictionary = sim.config
 	check(config.tracks.size() == cases.track_y.size(), "Exactly six full-length tracks")
 	check(config.buffers.size() == int(cases.buffer_count), "Eight buffers")
-	check(config.exits.size() == int(cases.exit_count), "Six open exits")
+	check(config.exits.size() == int(cases.exit_count), "Four main-track exits")
 	check(config.approach_tracks.size() == cases.approaches.size(), "Two approach tracks")
 	check(config.tracks.size() + config.approach_tracks.size() == int(cases.total_track_count), "Eight total tracks")
-	check(config.switches.size() == int(cases.switch_count), "Twelve active switches")
-	check(config.merges.size() == int(cases.merge_count), "Ten passive merges")
+	check(config.switches.size() == int(cases.switch_count), "Ten active switches")
+	check(config.merges.size() == int(cases.merge_count), "Twelve passive merges")
 	check(sim.switches.size() == config.switches.size(), "Runtime state contains only active switches")
 	sim.restart(0)
 	for id in config.switches:
@@ -107,13 +107,14 @@ func test_topology(sim) -> void:
 				check(sim.route(id, nodes[i - 1]) == nodes[i + 1], "Straight route continues rightward")
 				check(sim.route(id, nodes[i + 1]) == nodes[i - 1], "Straight route continues leftward")
 	check(siding_count == int(cases.siding_count), "Four complete sidings")
+	var expected_entries := expected_exits.duplicate()
 	for index in range(config.approach_tracks.size()):
 		var approach: Dictionary = config.approach_tracks[index]
 		var expected: Dictionary = cases.approaches[index]
 		check(approach.kind == "approach" and approach.nodes == [expected.exit, expected.junction], "Explicit named angled approach")
 		var end: String = approach.nodes[0]
 		var junction: String = approach.nodes[1]
-		expected_exits.append(end)
+		expected_entries.append(end)
 		covered[end] = true
 		check(sim.point(end).distance_to(Vector2(expected.position[0], expected.position[1])) < cases.epsilon, "Approach exit position: " + end)
 		check(sim.point(junction).distance_to(Vector2(expected.junction_position[0], expected.junction_position[1])) < cases.epsilon, "Approach junction position: " + junction)
@@ -128,13 +129,17 @@ func test_topology(sim) -> void:
 	expected_exits.sort()
 	var actual_buffers: Array = config.buffers.duplicate()
 	var actual_exits: Array = config.exits.duplicate()
+	var actual_entries: Array = config.entries.duplicate()
 	actual_buffers.sort()
 	actual_exits.sort()
 	check(actual_buffers == expected_buffers, "Both ends of each siding buffered, and no others")
-	check(actual_exits == expected_exits, "Only main and approach ends are open")
+	check(actual_exits == expected_exits, "Only main-track ends are exits")
+	expected_entries.sort()
+	actual_entries.sort()
+	check(actual_entries == expected_entries, "Main and approach ends accept arrivals")
 	for id in config.nodes:
 		var adjacent := neighbors(config, id)
-		if id in config.buffers or id in config.exits:
+		if id in config.buffers or id in config.entries:
 			check(adjacent.size() == 1 and not config.switches.has(id) and not config.merges.has(id), "Terminal has exactly one neighbor and no routing metadata")
 		else:
 			check(adjacent.size() == 3 and config.switches.has(id) != config.merges.has(id), "Every junction has exactly one routing kind")
@@ -244,7 +249,7 @@ func follow_path(sim, path: Array, start_index: int = -1, small = null) -> void:
 		elif sim.config.merges.has(current):
 			check(cases.merge_routes[current][path[i - 1]] == next, "Fixed merge permits path at " + current)
 		var incoming: Vector2 = sim.heading()
-		var distance: float = sim.edge_length() - sim.progress
+		var distance: float = sim.distance_to_event()
 		var duration: float = (distance + cases.epsilon) / sim.config.speed
 		sim.advance(duration)
 		if small != null:
@@ -280,10 +285,11 @@ func test_cross_station(sim) -> void:
 	for approach in cases.approaches:
 		var classified: Array = approach.reachable_exits + approach.unreachable_exits
 		var other_exits: Array = sim.config.exits.duplicate()
-		other_exits.erase(approach.exit)
 		classified.sort()
 		other_exits.sort()
-		check(classified == other_exits, "Reachability fixtures classify every other exit exactly once: " + approach.exit)
+		check(classified == other_exits, "Reachability fixtures classify every exit exactly once: " + approach.exit)
+		for destination in cases.approaches:
+			check(find_path(sim, [approach.exit, approach.junction], destination.exit).is_empty(), "Neither approach is reachable outbound")
 		for target in approach.reachable_exits:
 			var path := find_path(sim, [approach.exit, approach.junction], target)
 			check(not path.is_empty(), "Approach reaches declared exit: %s -> %s" % [approach.exit, target])
@@ -484,14 +490,15 @@ func run() -> void:
 				check(not sim.is_locked(id), "Rear releases: " + id)
 				check(sim.toggle(id), "Can switch after clearing: " + id)
 				sim.switches[id] = setting
-	check(active_routes == int(cases.active_route_count), "Exactly 72 active route cases")
+	check(active_routes == int(cases.active_route_count), "All active routes covered")
 	check(cases.merge_routes.size() == config.merges.size(), "Independent fixed fixtures cover every merge")
 	var merge_routes := 0
 	for id in config.merges:
 		var ports: Array = config.merges[id].ports
 		check(config.merges[id].keys() == ["ports"], "Passive metadata has ports only: " + id)
 		check(cases.merge_routes[id].size() == ports.size(), "Three fixed entry fixtures: " + id)
-		check(sim.point(ports[0]).x > sim.point(id).x and sim.point(ports[1]).x < sim.point(id).x and sim.point(ports[2]).x < sim.point(id).x, "Passive stem right, straight and branch left: " + id)
+		var stem_side := signf(sim.point(ports[0]).x - sim.point(id).x)
+		check(stem_side != 0.0 and signf(sim.point(ports[1]).x - sim.point(id).x) == -stem_side and signf(sim.point(ports[2]).x - sim.point(id).x) == -stem_side, "Passive stem opposite straight and branch: " + id)
 		for incoming in cases.merge_routes[id]:
 			merge_routes += 1
 			sim.restart(0)
@@ -506,18 +513,17 @@ func run() -> void:
 			check(incoming_heading.dot(sim.heading()) > 0.0 and incoming_heading.x * sim.heading().x > 0.0, "Passive traversal preserves forward horizontal heading: " + id)
 			check(not sim.is_locked(id) and not sim.rear_locks.has(id) and not sim.toggle(id), "Passive rear contact never creates lock or accepts toggle: " + id)
 			check(sim.switches == before and not sim.switches.has(id), "Passive routing adds no selectable state: " + id)
-	check(merge_routes == int(cases.merge_route_count), "Exactly 30 fixed merge route cases")
+	check(merge_routes == int(cases.merge_route_count), "All fixed merge routes covered")
 	# All eight buffers reflect, including the four not used by starts.
 	for buffer in config.buffers:
 		var neighbor: String = neighbors(config, buffer)[0]
 		sim.restart()
 		place(sim, neighbor, buffer, 0.0)
 		var incoming_heading: Vector2 = sim.heading()
-		var distance: float = sim.edge_length()
-		sim.advance((distance + half) / speed)
+		sim.advance_distance(sim.distance_to_event())
 		check(sim.from_node == buffer and sim.to_node == neighbor, "Buffer reverses direction: " + buffer)
 		check(near(incoming_heading.dot(sim.heading()), -1.0), "Buffer exactly reverses heading: " + buffer)
-		check(near(sim.progress, half), "Buffer carries leftover distance: " + buffer)
+		check(near(sim.progress, half), "Buffer reflects at front contact: " + buffer)
 		check(sim.rear_locks.is_empty(), "Buffer does not leave a stale rear lock: " + buffer)
 		check(sim.is_locked(neighbor) == (config.switches.has(neighbor) and sim.edge_length() - sim.progress <= half), "Buffer return locks only active switch on front contact: " + buffer)
 	# Starts cover exactly the four distinct sidings with production initial routing.
@@ -590,7 +596,7 @@ func run() -> void:
 		var extent: Vector2
 		if id in config.buffers:
 			extent = Vector2(visual.buffer_width / 2.0, visual.buffer_half_width + visual.buffer_width / 2.0)
-		elif id in config.exits:
+		elif id in config.entries:
 			extent = Vector2.ONE * float(visual.exit_radius)
 		else:
 			extent = Vector2.ONE * maxf(visual.click_radius, maxf(visual.switch_radius, visual.route_arm + visual.route_width / 2.0))

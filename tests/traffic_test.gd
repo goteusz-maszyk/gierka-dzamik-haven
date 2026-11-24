@@ -95,18 +95,18 @@ func test_entries_and_scheduler() -> void:
 	var seen := {}
 	var removed: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://config/cart_test_cases.json")).removed_nodes
 	var eligible := []
-	for entry in sim.cart.config.exits:
+	for entry in sim.cart.config.entries:
 		if sim._entry_safe(entry, sim.config.warning_duration):
 			eligible.append(entry)
 	for id in removed:
-		check(id not in eligible and id not in sim.cart.config.exits, "Removed node is not spawn eligible: " + id)
+		check(id not in eligible and id not in sim.cart.config.entries, "Removed node is not spawn eligible: " + id)
 	for draw in range(int(cases.random_draws)):
 		sim.restart()
 		sim.advance(first)
 		check(not removed.has(sim.warnings[0].entry), "Warning never selects a removed entry")
 		seen[sim.warnings[0].entry] = true
-	check(seen.size() == sim.cart.config.exits.size(), "Uniform entry selection reaches all six exits")
-	for entry in sim.cart.config.exits:
+	check(seen.size() == sim.cart.config.entries.size(), "Entry selection reaches all six entrances")
+	for entry in sim.cart.config.entries:
 		sim = fresh()
 		park_cart(sim)
 		sim.config.spawning_enabled = true
@@ -201,7 +201,7 @@ func test_busy_entry() -> void:
 	sim.config.train.cart_length = cases.geometry_train_length
 	entry = cases.crossing_entry
 	var junction := neighbor(sim, entry)
-	var ports: Array = sim.cart.config.switches[junction].ports
+	var ports: Array = sim.cart.config.merges[junction].ports
 	blocker = train_at(sim, ports[0], junction, 0.0)
 	blocker.progress = blocker.edge_length()
 	blocker.config.cart_width = cases.crossing_blocker_width
@@ -254,8 +254,8 @@ func test_routes_and_locks() -> void:
 			check(not sim.is_locked(id) and not sim.toggle(id) and not train.rear_locks.has(id), "Passive merge has no selectable route or rear lock " + id)
 			passive_count += 1
 			sim.trains.clear()
-	check(active_count == int(cart_cases.active_route_count), "All 72 active train combinations advanced")
-	check(passive_count == int(cart_cases.merge_route_count), "All 30 passive train entries advanced")
+	check(active_count == int(cart_cases.active_route_count), "All active train routes advanced")
+	check(passive_count == int(cart_cases.merge_route_count), "All passive train routes advanced")
 	var lock: Dictionary = cases.lock
 	var a = train_at(sim, lock.id, lock.to, 0.0)
 	var b = train_at(sim, lock.id, lock.to, 0.0)
@@ -461,6 +461,14 @@ func test_rotation_boundaries() -> void:
 	for sim in [big, small]:
 		park_cart(sim)
 		sim.config.train.cart_length = cases.geometry_train_length
+		# Make this an isolated switch-rotation fixture, not an outbound production route.
+		sim.cart.config.switches[data.node] = {"ports": sim.cart.config.merges[data.node].ports, "initial": 1}
+		sim.cart.config.merges.erase(data.node)
+		sim.cart.config.exits.append(data.entry)
+		var junction_point: Vector2 = sim.cart.point(data.node)
+		var approach_direction: Vector2 = junction_point.direction_to(sim.cart.point(data.entry))
+		var entry_point := junction_point + approach_direction * float(data.approach_length)
+		sim.cart.config.nodes[data.entry] = [entry_point.x, entry_point.y]
 		var moving = train_at(sim, data.from, data.node, 0.0)
 		moving.progress = moving.edge_length() - data.incoming_distance
 		sim.cart.switches[data.node] = 1
@@ -474,9 +482,12 @@ func test_rotation_boundaries() -> void:
 	# Binary-exact substeps isolate simultaneous rotation/expiry from accumulated progress rounding.
 	small_advance(small, duration, data.small_step)
 	check(not big.lost and big.trains.size() == 1 and big.warnings.size() == 1, "Node rotation blocks simultaneous warning expiry before spawning")
-	check(near(big.elapsed, duration) and near(big.warnings[0].remaining, 0.0), "Warning expires exactly at the rotation event")
-	check(big.trains[0].from_node == data.node and big.trains[0].to_node == data.entry, "Fixture actually rotates onto the surviving approach")
-	check(not big._footprint_clear(big._entry_train(data.entry)), "Rotated footprint actually blocks the simultaneous spawn")
+	if big.warnings.size() == 1:
+		check(near(big.elapsed, duration) and near(big.warnings[0].remaining, 0.0), "Warning expires exactly at the rotation event")
+		check(near(big.warnings[0].check_at, duration + big.config.retry_interval), "Blocked warning is rescheduled at the rotation event")
+	if big.trains.size() == 1:
+		check(big.trains[0].from_node == data.node and big.trains[0].to_node == data.entry, "Fixture actually rotates onto the test branch")
+		check(not big._footprint_clear(big._entry_train(data.entry)), "Rotated footprint actually blocks the simultaneous spawn")
 	compare(big, small, "Warning/rotation simultaneous boundary")
 
 

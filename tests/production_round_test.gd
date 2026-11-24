@@ -96,7 +96,7 @@ func observe_until(r, deadline: float, counts: Dictionary, label: String) -> voi
 		check(r.warnings.size() <= int(data.expected.max_warnings), label + " pending warning limit")
 		counts.max_pending = maxi(counts.get("max_pending", 0), r.warnings.size())
 		for warning in r.warnings:
-			check(warning.entry in r.cart.config.exits, label + " warning uses real entry")
+			check(warning.entry in r.cart.config.entries, label + " warning uses real entry")
 			check(warning.entry not in entries, label + " distinct pending entries")
 			entries.append(warning.entry)
 			check(warning.check_at >= warning.spawn_at, label + " independent retry deadline")
@@ -170,7 +170,7 @@ func run() -> void:
 	var production = Traffic.new()
 	for key in data.expected:
 		check(production.config[key] == data.expected[key], "Production setting: " + key)
-	check(production.cart.config.exits.size() == 6, "All six real entries available")
+	check(production.cart.config.entries.size() == 6, "All six real entries available")
 	check(production.cart.config.starts.size() == 4, "All four production starts covered")
 	check(data.bulk_delta > production.config.round_duration, "Bulk delta exceeds entire round")
 	check(data.small_step < production.config.retry_interval, "Observation step resolves retry cadence")

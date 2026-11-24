@@ -118,7 +118,7 @@ func test_forecasts() -> void:
 	sim.config.train.cart_length = geometry.geometry_train_length
 	train_at(sim, rotation.from, rotation.node, 0.0, sim.config.train.speed)
 	train_at(sim, rotation.blocker_from, rotation.blocker_to, rotation.blocker_progress, 0.0)
-	check("lower_left_approach_exit" in sim.cart.config.exits, "Rotation forecast uses a real remote entry")
+	check("lower_left_approach_exit" in sim.cart.config.entries, "Rotation forecast uses a real remote entry")
 	check(not sim._entry_safe("lower_left_approach_exit", sim.config.warning_duration), "Forecast catches node-rotation tangency in existing traffic")
 	sim = Traffic.new()
 	sim.config.spawning_enabled = false
